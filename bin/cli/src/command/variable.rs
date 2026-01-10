@@ -1,6 +1,6 @@
-use std::io::Read;
+use std::process::Command;
 
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use colored::Colorize;
 use comfy_table::{Attribute, Cell, Color, Table};
 use komodo_client::{
@@ -19,20 +19,35 @@ use komodo_client::{
 
 use crate::config::cli_config;
 
+/// Check if showing secrets is allowed via environment variable.
+/// Returns true if KM_SHOW_SECRETS=true is set.
+fn secrets_display_allowed() -> bool {
+  std::env::var("KM_SHOW_SECRETS")
+    .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+    .unwrap_or(false)
+}
+
 pub async fn handle(variable: &Variable) -> anyhow::Result<()> {
   match &variable.command {
     VariableCommand::List { format } => list_variables(*format).await,
-    VariableCommand::Get { name, yes } => {
-      get_variable(name, *yes).await
-    }
+    VariableCommand::Get { name } => get_variable(name).await,
     VariableCommand::Create {
       name,
       value,
+      from_command,
       secret,
       description,
       yes,
     } => {
-      create_variable(name, value, *secret, description, *yes).await
+      create_variable(
+        name,
+        value.as_deref(),
+        from_command.as_deref(),
+        *secret,
+        description,
+        *yes,
+      )
+      .await
     }
     VariableCommand::Delete { name, yes } => {
       delete_variable(name, *yes).await
@@ -109,7 +124,7 @@ async fn list_variables(format: CliFormat) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn get_variable(name: &str, yes: bool) -> anyhow::Result<()> {
+async fn get_variable(name: &str) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   let variable = client
@@ -119,23 +134,24 @@ async fn get_variable(name: &str, yes: bool) -> anyhow::Result<()> {
     .await
     .context("Failed to get variable")?;
 
-  // Check if the variable is a secret and warn the user
-  if variable.is_secret && !yes {
+  // For secret variables, require explicit opt-in via environment variable
+  // Don't reveal the mechanism in the error message for security
+  if variable.is_secret && !secrets_display_allowed() {
+    println!("\n{}: {}", "Name".dimmed(), variable.name.bold());
+    println!("{}: {}", "Value".dimmed(), "********".yellow());
+    println!("{}: {}", "Secret".dimmed(), "Yes".yellow());
+    if !variable.description.is_empty() {
+      println!(
+        "{}: {}",
+        "Description".dimmed(),
+        variable.description
+      );
+    }
     println!(
-      "\n{}: This variable is marked as {}!",
-      "WARNING".yellow().bold(),
-      "SECRET".red().bold()
+      "\n{}: Secret variable values are hidden for security.",
+      "INFO".blue()
     );
-    println!("The value may contain sensitive information.\n");
-    println!(
-      "Press {} to reveal the value or {} to cancel\n",
-      "ENTER".green(),
-      "Ctrl+C".red()
-    );
-    let buffer = &mut [0u8];
-    std::io::stdin()
-      .read_exact(buffer)
-      .context("failed to read ENTER")?;
+    return Ok(());
   }
 
   println!("\n{}: {}", "Name".dimmed(), variable.name.bold());
@@ -150,16 +166,65 @@ async fn get_variable(name: &str, yes: bool) -> anyhow::Result<()> {
   Ok(())
 }
 
+/// Execute a shell command and return its stdout output.
+/// Handles special characters properly by using shell execution.
+fn execute_command(cmd: &str) -> anyhow::Result<String> {
+  let output = if cfg!(target_os = "windows") {
+    Command::new("cmd").args(["/C", cmd]).output()
+  } else {
+    Command::new("sh").args(["-c", cmd]).output()
+  }
+  .context("Failed to execute command")?;
+
+  if !output.status.success() {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    return Err(anyhow!(
+      "Command failed with exit code {}: {}",
+      output.status.code().unwrap_or(-1),
+      stderr.trim()
+    ));
+  }
+
+  let stdout = String::from_utf8(output.stdout)
+    .context("Command output contains invalid UTF-8")?;
+
+  // Trim trailing newline that most commands add
+  Ok(stdout.trim_end_matches('\n').to_string())
+}
+
 async fn create_variable(
   name: &str,
-  value: &str,
+  value: Option<&str>,
+  from_command: Option<&str>,
   secret: bool,
   description: &str,
   yes: bool,
 ) -> anyhow::Result<()> {
+  // Get the value either from direct input or by executing a command
+  let final_value = if let Some(cmd) = from_command {
+    println!(
+      "\n{}: Executing command to get value...",
+      "INFO".blue()
+    );
+    execute_command(cmd)?
+  } else {
+    value
+      .ok_or_else(|| {
+        anyhow!("Either value or --from-command must be provided")
+      })?
+      .to_string()
+  };
+
   println!("\n{}: Create Variable\n", "Mode".dimmed());
   println!(" - {}:  {name}", "Name".dimmed());
-  println!(" - {}: {value}", "Value".dimmed());
+
+  // Don't show the actual value if it's a secret
+  if secret {
+    println!(" - {}: {}", "Value".dimmed(), "********".yellow());
+  } else {
+    println!(" - {}: {final_value}", "Value".dimmed());
+  }
+
   println!(" - {}: {secret}", "Is Secret".dimmed());
   if !description.is_empty() {
     println!(" - {}: {description}", "Description".dimmed());
@@ -172,7 +237,7 @@ async fn create_variable(
   let created = client
     .write(CreateVariable {
       name: name.to_string(),
-      value: value.to_string(),
+      value: final_value,
       is_secret: secret,
       description: description.to_string(),
     })

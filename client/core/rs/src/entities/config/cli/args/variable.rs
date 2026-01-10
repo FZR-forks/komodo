@@ -22,10 +22,6 @@ pub enum VariableCommand {
   Get {
     /// The name of the variable to get
     name: String,
-
-    /// Confirm you want to view a secret variable's value without warning
-    #[arg(long, short = 'y', default_value_t = false)]
-    yes: bool,
   },
 
   /// Create a new variable (aliases: `c`, `add`)
@@ -34,8 +30,18 @@ pub enum VariableCommand {
     /// The name of the variable
     name: String,
 
-    /// The value of the variable
-    value: String,
+    /// The value of the variable. Required unless --from-command is used.
+    #[arg(required_unless_present = "from_command")]
+    value: Option<String>,
+
+    /// Get the value by running a shell command and capturing its stdout.
+    /// Example: --from-command "openssl rand -hex 32"
+    #[arg(
+      long = "from-command",
+      short = 'c',
+      conflicts_with = "value"
+    )]
+    from_command: Option<String>,
 
     /// Whether this variable should be a secret
     #[arg(long, short = 's', default_value_t = false)]
