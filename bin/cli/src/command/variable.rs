@@ -8,7 +8,13 @@ use komodo_client::{
     read::{GetVariable, ListVariables},
     write::{CreateVariable, DeleteVariable},
   },
-  entities::config::cli::{CliTableBorders, args::{CliFormat, variable::{Variable, VariableCommand}}},
+  entities::config::cli::{
+    CliTableBorders,
+    args::{
+      CliFormat,
+      variable::{Variable, VariableCommand},
+    },
+  },
 };
 
 use crate::config::cli_config;
@@ -16,14 +22,18 @@ use crate::config::cli_config;
 pub async fn handle(variable: &Variable) -> anyhow::Result<()> {
   match &variable.command {
     VariableCommand::List { format } => list_variables(*format).await,
-    VariableCommand::Get { name, yes } => get_variable(name, *yes).await,
+    VariableCommand::Get { name, yes } => {
+      get_variable(name, *yes).await
+    }
     VariableCommand::Create {
       name,
       value,
       secret,
       description,
       yes,
-    } => create_variable(name, value, *secret, description, *yes).await,
+    } => {
+      create_variable(name, value, *secret, description, *yes).await
+    }
     VariableCommand::Delete { name, yes } => {
       delete_variable(name, *yes).await
     }
@@ -48,7 +58,9 @@ async fn list_variables(format: CliFormat) -> anyhow::Result<()> {
       let preset = {
         use comfy_table::presets::*;
         match cli_config().table_borders {
-          None | Some(CliTableBorders::Horizontal) => UTF8_HORIZONTAL_ONLY,
+          None | Some(CliTableBorders::Horizontal) => {
+            UTF8_HORIZONTAL_ONLY
+          }
           Some(CliTableBorders::Vertical) => UTF8_FULL_CONDENSED,
           Some(CliTableBorders::Inside) => UTF8_NO_BORDERS,
           Some(CliTableBorders::Outside) => UTF8_BORDERS_ONLY,
@@ -58,9 +70,8 @@ async fn list_variables(format: CliFormat) -> anyhow::Result<()> {
 
       let mut table = Table::new();
       table.load_preset(preset).set_header(
-        ["Name", "Value", "Secret", "Description"].map(|h| {
-          Cell::new(h).add_attribute(Attribute::Bold)
-        }),
+        ["Name", "Value", "Secret", "Description"]
+          .map(|h| Cell::new(h).add_attribute(Attribute::Bold)),
       );
 
       for var in variables {
@@ -115,9 +126,7 @@ async fn get_variable(name: &str, yes: bool) -> anyhow::Result<()> {
       "WARNING".yellow().bold(),
       "SECRET".red().bold()
     );
-    println!(
-      "The value may contain sensitive information.\n"
-    );
+    println!("The value may contain sensitive information.\n");
     println!(
       "Press {} to reveal the value or {} to cancel\n",
       "ENTER".green(),
@@ -179,7 +188,10 @@ async fn create_variable(
   Ok(())
 }
 
-async fn delete_variable(name: &str, yes: bool) -> anyhow::Result<()> {
+async fn delete_variable(
+  name: &str,
+  yes: bool,
+) -> anyhow::Result<()> {
   println!("\n{}: Delete Variable\n", "Mode".dimmed());
   println!(" - {}:  {name}", "Name".dimmed());
 

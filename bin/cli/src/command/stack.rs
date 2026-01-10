@@ -3,7 +3,9 @@ use colored::Colorize;
 use comfy_table::{Attribute, Cell, Color, Table};
 use komodo_client::{
   api::read::{GetStackLog, ListStackServices},
-  entities::config::cli::args::stack::{Stack, StackCommand, StackLogs},
+  entities::config::cli::args::stack::{
+    Stack, StackCommand, StackLogs,
+  },
 };
 
 use crate::config::cli_config;
@@ -38,7 +40,9 @@ async fn list_services(stack: &str) -> anyhow::Result<()> {
     use comfy_table::presets::*;
     use komodo_client::entities::config::cli::CliTableBorders;
     match cli_config().table_borders {
-      None | Some(CliTableBorders::Horizontal) => UTF8_HORIZONTAL_ONLY,
+      None | Some(CliTableBorders::Horizontal) => {
+        UTF8_HORIZONTAL_ONLY
+      }
       Some(CliTableBorders::Vertical) => UTF8_FULL_CONDENSED,
       Some(CliTableBorders::Inside) => UTF8_NO_BORDERS,
       Some(CliTableBorders::Outside) => UTF8_BORDERS_ONLY,
@@ -47,17 +51,17 @@ async fn list_services(stack: &str) -> anyhow::Result<()> {
   };
 
   let mut table = Table::new();
-  table
-    .load_preset(preset)
-    .set_header(["Service", "Image", "Container", "State"].map(|h| {
-      Cell::new(h).add_attribute(Attribute::Bold)
-    }));
+  table.load_preset(preset).set_header(
+    ["Service", "Image", "Container", "State"]
+      .map(|h| Cell::new(h).add_attribute(Attribute::Bold)),
+  );
 
   for service in services {
-    let (container_name, state, color) =
-      if let Some(container) = &service.container {
-        let state = container.state.to_string();
-        let color = match container.state {
+    let (container_name, state, color) = if let Some(container) =
+      &service.container
+    {
+      let state = container.state.to_string();
+      let color = match container.state {
           komodo_client::entities::docker::container::ContainerStateStatusEnum::Running => {
             Color::Green
           }
@@ -69,10 +73,10 @@ async fn list_services(stack: &str) -> anyhow::Result<()> {
           }
           _ => Color::Red,
         };
-        (container.name.clone(), state, color)
-      } else {
-        (String::from("-"), String::from("Not running"), Color::Grey)
-      };
+      (container.name.clone(), state, color)
+    } else {
+      (String::from("-"), String::from("Not running"), Color::Grey)
+    };
 
     table.add_row([
       Cell::new(&service.service).add_attribute(Attribute::Bold),
@@ -86,7 +90,10 @@ async fn list_services(stack: &str) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn show_logs(stack: &str, logs: &StackLogs) -> anyhow::Result<()> {
+async fn show_logs(
+  stack: &str,
+  logs: &StackLogs,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   // Cap tail at 5000
