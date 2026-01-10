@@ -7,7 +7,9 @@ use crate::api::execute::Execution;
 pub mod container;
 pub mod database;
 pub mod list;
+pub mod stack;
 pub mod update;
+pub mod variable;
 
 #[derive(Debug, clap::Parser)]
 #[command(name = "komodo-cli", version, about = "", author)]
@@ -86,6 +88,14 @@ pub enum Command {
     #[command(subcommand)]
     command: database::DatabaseCommand,
   },
+
+  /// Stack operations (logs, services). (aliases: `stk`, `sk`)
+  #[clap(alias = "stk", alias = "sk")]
+  Stack(stack::Stack),
+
+  /// Variable management (list, get, create, delete). (aliases: `var`, `v`)
+  #[clap(alias = "var", alias = "v")]
+  Variable(variable::Variable),
 }
 
 #[derive(Debug, Clone, clap::Parser)]
