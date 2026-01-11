@@ -7,7 +7,9 @@ use crate::api::execute::Execution;
 pub mod container;
 pub mod database;
 pub mod list;
+pub mod procedure;
 pub mod stack;
+pub mod sync;
 pub mod update;
 pub mod variable;
 
@@ -89,13 +91,21 @@ pub enum Command {
     command: database::DatabaseCommand,
   },
 
-  /// Stack operations (logs, services). (aliases: `stk`, `sk`)
+  /// Stack operations (list, status, logs, services, deploys). (aliases: `stk`, `sk`)
   #[clap(alias = "stk", alias = "sk")]
   Stack(stack::Stack),
 
   /// Variable management (list, get, create, delete). (aliases: `var`, `v`)
   #[clap(alias = "var", alias = "v")]
   Variable(variable::Variable),
+
+  /// Procedure operations (list, status, logs). (aliases: `proc`, `pr`)
+  #[clap(alias = "proc", alias = "pr")]
+  Procedure(procedure::Procedure),
+
+  /// Resource sync operations (list, status, logs, diff). (aliases: `sn`, `rs`)
+  #[clap(alias = "sn", alias = "rs")]
+  Sync(sync::Sync),
 }
 
 #[derive(Debug, Clone, clap::Parser)]

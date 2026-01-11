@@ -18,7 +18,9 @@ pub mod container;
 pub mod database;
 pub mod execute;
 pub mod list;
+pub mod procedure;
 pub mod stack;
+pub mod sync;
 pub mod update;
 pub mod variable;
 

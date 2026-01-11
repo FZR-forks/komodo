@@ -34,3 +34,4 @@ tokio.workspace = true
 serde.workspace = true
 clap.workspace = true
 envy.workspace = true
+bson.workspace = true
