@@ -14,105 +14,185 @@ Note: On Ubuntu, also requires `apt install build-essential pkg-config libssl-de
 
 ### Credentials
 
-Configure a file `~/.config/komodo/creds.toml` file with contents:
-```toml
-url = "https://your.komodo.address"
-key = "YOUR-API-KEY"
-secret = "YOUR-API-SECRET"
+Configure credentials using environment variables:
+```sh
+export KM_KOMODO_URL="https://your.komodo.address"
+export KM_KOMODO_API_KEY="YOUR-API-KEY"
+export KM_KOMODO_API_SECRET="YOUR-API-SECRET"
 ```
 
-Note. You can specify a different creds file by using `--creds ./other/path.toml`.
-You can also bypass using any file and pass the information using `--url`, `--key`, `--secret`:
+Or configure a file `~/.config/komodo/komodo.cli.toml` with contents:
+```toml
+host = "https://your.komodo.address"
+cli_key = "YOUR-API-KEY"
+cli_secret = "YOUR-API-SECRET"
+```
+
+You can also pass the information using command line arguments:
+```sh
+km execute -a "https://your.komodo.address" -k "YOUR-API-KEY" -s "YOUR-API-SECRET" ...
+```
+
+### Listing Resources
+
+List all resources or filter by type using `km list`:
+```sh
+km list                          # List all resources
+km list stacks                   # List all stacks
+km list procedures               # List all procedures
+km list syncs                    # List all resource syncs
+km list -d                       # List only down/failed resources
+km list -a                       # List all including down
+```
+
+### Stack Operations
+
+Get detailed information about a specific stack:
+```sh
+km stack my-stack status         # Get detailed status
+km stk my-stack s                # Using aliases
+```
+
+View stack container logs:
+```sh
+km stack my-stack logs                    # View container logs (last 100 lines)
+km stack my-stack logs -s nginx           # Filter to specific service
+km stack my-stack logs -s nginx -s redis  # Multiple services
+km stack my-stack logs -n 200             # Show last 200 lines (default: 100, max: 5000)
+km stack my-stack logs -t                 # Include timestamps
+```
+
+List services in a stack:
+```sh
+km stack my-stack services       # List all services and their state
+```
+
+View deployment history and detailed logs:
+```sh
+km stack my-stack deploys              # Show most recent 10 deployments
+km stack my-stack deploys -n 20        # Show most recent 20 deployments
+km stack my-stack deploy-log <ID>      # View detailed logs for a specific deployment
+```
+
+### Procedure Operations
+
+Get information about a procedure:
+```sh
+km procedure my-proc status            # Get detailed status
+km proc my-proc s                      # Using aliases
+```
+
+View run history and detailed logs:
+```sh
+km procedure my-proc logs              # Show most recent 10 runs
+km procedure my-proc logs -n 20        # Show most recent 20 runs
+km procedure my-proc run-log <ID>      # View detailed logs for a specific run
+```
+
+### Resource Sync Operations
+
+Get information about a sync:
+```sh
+km sync my-sync status                 # Get detailed status
+km sn my-sync s                        # Using aliases
+km sync my-sync diff                   # Show pending diffs from upstream
+```
+
+View run history and detailed logs:
+```sh
+km sync my-sync logs                   # Show most recent 10 runs
+km sync my-sync logs -n 20             # Show most recent 20 runs
+km sync my-sync run-log <ID>           # View detailed logs for a specific run
+```
+
+### Variable Management
 
 ```sh
-komodo --url "https://your.komodo.address" --key "YOUR-API-KEY" --secret "YOUR-API-SECRET" ...
+km variable list                 # List all variables (secrets shown as ********)
+km var ls                        # Using aliases
+km var get MY_VAR                # Get variable value (requires KM_SHOW_SECRETS=true for secrets)
+```
+
+Create a variable:
+```sh
+km var create MY_VAR "my-value"              # Create regular variable
+km var create API_KEY "secret" -s            # Create secret variable
+km var create API_KEY "secret" -s -d "desc"  # With description
+```
+
+Create a variable from command output:
+```sh
+km var create API_KEY -c "openssl rand -hex 32" -s  # Value from command
+```
+
+Delete a variable:
+```sh
+km var delete MY_VAR             # Delete with confirmation
+km var delete MY_VAR -y          # Delete without confirmation
 ```
 
 ### Run Executions
 
+Execute commands require confirmation by default. Use `-y` or `--yes` to skip confirmation for automation/scripting:
+
 ```sh
-# Triggers an example build
-komodo execute run-build test_build
+# Interactive (requires pressing ENTER)
+km execute deploy-stack my-stack
+km execute run-sync my-sync
+km execute run-procedure my-procedure
+
+# Non-interactive (for scripts/automation)
+km execute deploy-stack my-stack -y
+km execute run-sync my-sync --yes
+km execute run-procedure my-procedure -y
 ```
 
-#### Manual
-`komodo --help`
-```md
-Command line tool to execute Komodo actions
+Other execution examples:
+```sh
+km execute run-build test_build -y       # Run a build
+km execute destroy-stack my-stack -y     # Destroy a stack
+```
 
-Usage: komodo [OPTIONS] <COMMAND>
+### Other Commands
+
+```sh
+km config                        # Print the CLI config being used
+km container                     # Container info
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `KM_KOMODO_URL` | Komodo server URL (alias: `KOMODO_CLI_HOST`) |
+| `KM_KOMODO_API_KEY` | API key (alias: `KOMODO_CLI_KEY`) |
+| `KM_KOMODO_API_SECRET` | API secret (alias: `KOMODO_CLI_SECRET`) |
+| `KM_SHOW_SECRETS` | Set to `true` to allow viewing secret variable values |
+
+## Full Command Reference
+
+`km --help`
+```md
+Usage: km [OPTIONS] <COMMAND>
 
 Commands:
-  execute  Runs an execution
-  help     Print this message or the help of the given subcommand(s)
+  config     Print the CLI config being used
+  container  Container info
+  inspect    Inspect containers
+  list       List Komodo resources
+  execute    Run Komodo executions
+  update     Update resource configuration
+  database   Database utilities
+  stack      Stack operations (status, logs, services, deploys)
+  variable   Variable management (list, get, create, delete)
+  procedure  Procedure operations (status, logs, run-log)
+  sync       Resource sync operations (status, logs, run-log, diff)
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
-      --creds <CREDS>    The path to a creds file [default: /Users/max/.config/komodo/creds.toml]
-      --url <URL>        Pass url in args instead of creds file
-      --key <KEY>        Pass api key in args instead of creds file
-      --secret <SECRET>  Pass api secret in args instead of creds file
-  -y, --yes              Always continue on user confirmation prompts
-  -h, --help             Print help (see more with '--help')
-  -V, --version          Print version
+  -p, --profile <PROFILE>          Choose a custom profile
+  -c, --config-path <CONFIG_PATH>  Config file or directory path
+  -h, --help                       Print help
+  -V, --version                    Print version
 ```
-
-`komodo execute --help`
-```md
-Runs an execution
-
-Usage: komodo execute <COMMAND>
-
-Commands:
-  none                    The "null" execution. Does nothing
-  run-procedure           Runs the target procedure. Response: [Update]
-  run-build               Runs the target build. Response: [Update]
-  cancel-build            Cancels the target build. Only does anything if the build is `building` when called. Response: [Update]
-  deploy                  Deploys the container for the target deployment. Response: [Update]
-  start-deployment        Starts the container for the target deployment. Response: [Update]
-  restart-deployment      Restarts the container for the target deployment. Response: [Update]
-  pause-deployment        Pauses the container for the target deployment. Response: [Update]
-  unpause-deployment      Unpauses the container for the target deployment. Response: [Update]
-  stop-deployment         Stops the container for the target deployment. Response: [Update]
-  destroy-deployment      Stops and destroys the container for the target deployment. Reponse: [Update]
-  clone-repo              Clones the target repo. Response: [Update]
-  pull-repo               Pulls the target repo. Response: [Update]
-  build-repo              Builds the target repo, using the attached builder. Response: [Update]
-  cancel-repo-build       Cancels the target repo build. Only does anything if the repo build is `building` when called. Response: [Update]
-  start-container         Starts the container on the target server. Response: [Update]
-  restart-container       Restarts the container on the target server. Response: [Update]
-  pause-container         Pauses the container on the target server. Response: [Update]
-  unpause-container       Unpauses the container on the target server. Response: [Update]
-  stop-container          Stops the container on the target server. Response: [Update]
-  destroy-container       Stops and destroys the container on the target server. Reponse: [Update]
-  start-all-containers    Starts all containers on the target server. Response: [Update]
-  restart-all-containers  Restarts all containers on the target server. Response: [Update]
-  pause-all-containers    Pauses all containers on the target server. Response: [Update]
-  unpause-all-containers  Unpauses all containers on the target server. Response: [Update]
-  stop-all-containers     Stops all containers on the target server. Response: [Update]
-  prune-containers        Prunes the docker containers on the target server. Response: [Update]
-  delete-network          Delete a docker network. Response: [Update]
-  prune-networks          Prunes the docker networks on the target server. Response: [Update]
-  delete-image            Delete a docker image. Response: [Update]
-  prune-images            Prunes the docker images on the target server. Response: [Update]
-  delete-volume           Delete a docker volume. Response: [Update]
-  prune-volumes           Prunes the docker volumes on the target server. Response: [Update]
-  prune-system            Prunes the docker system on the target server, including volumes. Response: [Update]
-  run-sync                Runs the target resource sync. Response: [Update]
-  deploy-stack            Deploys the target stack. `docker compose up`. Response: [Update]
-  start-stack             Starts the target stack. `docker compose start`. Response: [Update]
-  restart-stack           Restarts the target stack. `docker compose restart`. Response: [Update]
-  pause-stack             Pauses the target stack. `docker compose pause`. Response: [Update]
-  unpause-stack           Unpauses the target stack. `docker compose unpause`. Response: [Update]
-  stop-stack              Starts the target stack. `docker compose stop`. Response: [Update]
-  destroy-stack           Destoys the target stack. `docker compose down`. Response: [Update]
-  sleep                   
-  help                    Print this message or the help of the given subcommand(s)
-
-Options:
-  -h, --help  Print help
-```
-
-### --yes
-
-You can use `--yes` to avoid any human prompt to continue, for use in automated environments.
 

@@ -18,7 +18,11 @@ pub mod container;
 pub mod database;
 pub mod execute;
 pub mod list;
+pub mod procedure;
+pub mod stack;
+pub mod sync;
 pub mod update;
+pub mod variable;
 
 async fn komodo_client() -> anyhow::Result<&'static KomodoClient> {
   static KOMODO_CLIENT: OnceCell<KomodoClient> =

@@ -59,10 +59,13 @@ pub struct Env {
   // Override `default_profile`.
   pub komodo_cli_default_profile: Option<String>,
   /// Override `host` and `KOMODO_HOST`.
+  #[serde(alias = "km_komodo_url")]
   pub komodo_cli_host: Option<String>,
   /// Override `cli_key`
+  #[serde(alias = "km_komodo_api_key")]
   pub komodo_cli_key: Option<String>,
   /// Override `cli_secret`
+  #[serde(alias = "km_komodo_api_secret")]
   pub komodo_cli_secret: Option<String>,
   /// Override `table_borders`
   pub komodo_cli_table_borders: Option<CliTableBorders>,
