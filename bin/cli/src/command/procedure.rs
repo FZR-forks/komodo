@@ -2,7 +2,7 @@ use anyhow::Context;
 use colored::Colorize;
 use comfy_table::{Attribute, Cell, Color, Table};
 use komodo_client::{
-  api::read::{GetProcedure, ListUpdates},
+  api::read::{GetProcedure, GetUpdate, ListUpdates},
   entities::{
     Operation,
     config::cli::{
@@ -22,6 +22,7 @@ pub async fn handle(procedure: &Procedure) -> anyhow::Result<()> {
     ProcedureCommand::Logs { limit } => {
       show_logs(&procedure.procedure, *limit).await
     }
+    ProcedureCommand::RunLog { id } => show_run_log(id).await,
   }
 }
 
@@ -101,6 +102,13 @@ async fn show_logs(name: &str, limit: u32) -> anyhow::Result<()> {
     return Ok(());
   }
 
+  println!(
+    "\n{}: Showing {} most recent runs. Use `{}` to see detailed logs.\n",
+    "TIP".blue(),
+    limit.min(updates.updates.len() as u32),
+    "km procedure <name> run-log <ID>".bold()
+  );
+
   let preset = {
     use comfy_table::presets::*;
     match cli_config().table_borders {
@@ -147,5 +155,56 @@ async fn show_logs(name: &str, limit: u32) -> anyhow::Result<()> {
   }
 
   println!("{table}");
+  Ok(())
+}
+
+async fn show_run_log(id: &str) -> anyhow::Result<()> {
+  let client = super::komodo_client().await?;
+
+  let update = client
+    .read(GetUpdate { id: id.to_string() })
+    .await
+    .context("Failed to get procedure run log")?;
+
+  println!("\n{}: {}", "Run ID".dimmed(), update.id.bold());
+  println!("{}: {}", "Operation".dimmed(), update.operation);
+
+  let status = if update.success {
+    "Success".green()
+  } else {
+    "Failed".red()
+  };
+  println!("{}: {}", "Status".dimmed(), status);
+
+  let started = super::format_timetamp(update.start_ts)
+    .unwrap_or_else(|_| "-".to_string());
+  println!("{}: {}", "Started".dimmed(), started);
+
+  if let Some(end_ts) = update.end_ts {
+    let ended = super::format_timetamp(end_ts)
+      .unwrap_or_else(|_| "-".to_string());
+    println!("{}: {}", "Ended".dimmed(), ended);
+  }
+
+  println!("{}: {}", "Operator".dimmed(), update.operator);
+
+  if !update.logs.is_empty() {
+    println!("\n{}", "=== Logs ===".bold());
+    for log in &update.logs {
+      let stage = if log.success {
+        log.stage.green()
+      } else {
+        log.stage.red()
+      };
+      println!("\n[{}]", stage);
+      if !log.stdout.is_empty() {
+        print!("{}", log.stdout);
+      }
+      if !log.stderr.is_empty() {
+        eprint!("{}", log.stderr.red());
+      }
+    }
+  }
+
   Ok(())
 }

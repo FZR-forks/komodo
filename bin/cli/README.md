@@ -55,10 +55,11 @@ km stk my-stack s                # Using aliases
 
 View stack container logs:
 ```sh
-km stack my-stack logs                    # View container logs
+km stack my-stack logs                    # View container logs (last 100 lines)
 km stack my-stack logs -s nginx           # Filter to specific service
 km stack my-stack logs -s nginx -s redis  # Multiple services
-km stack my-stack logs -n 200 -t          # 200 lines with timestamps
+km stack my-stack logs -n 200             # Show last 200 lines (default: 100, max: 5000)
+km stack my-stack logs -t                 # Include timestamps
 ```
 
 List services in a stack:
@@ -66,31 +67,42 @@ List services in a stack:
 km stack my-stack services       # List all services and their state
 ```
 
-View deployment history:
+View deployment history and detailed logs:
 ```sh
-km stack my-stack deploys        # Show deployment history
-km stack my-stack deploys -n 20  # Show last 20 deployments
-km stack my-stack deploy-log <update-id>  # View logs for a specific deployment
+km stack my-stack deploys              # Show most recent 10 deployments
+km stack my-stack deploys -n 20        # Show most recent 20 deployments
+km stack my-stack deploy-log <ID>      # View detailed logs for a specific deployment
 ```
 
 ### Procedure Operations
 
 Get information about a procedure:
 ```sh
-km procedure my-proc status      # Get detailed status
-km proc my-proc s                # Using aliases
-km procedure my-proc logs        # View run history
-km procedure my-proc logs -n 20  # Show last 20 runs
+km procedure my-proc status            # Get detailed status
+km proc my-proc s                      # Using aliases
+```
+
+View run history and detailed logs:
+```sh
+km procedure my-proc logs              # Show most recent 10 runs
+km procedure my-proc logs -n 20        # Show most recent 20 runs
+km procedure my-proc run-log <ID>      # View detailed logs for a specific run
 ```
 
 ### Resource Sync Operations
 
 Get information about a sync:
 ```sh
-km sync my-sync status           # Get detailed status
-km sn my-sync s                  # Using aliases
-km sync my-sync logs             # View sync run history
-km sync my-sync diff             # Show pending diffs from upstream
+km sync my-sync status                 # Get detailed status
+km sn my-sync s                        # Using aliases
+km sync my-sync diff                   # Show pending diffs from upstream
+```
+
+View run history and detailed logs:
+```sh
+km sync my-sync logs                   # Show most recent 10 runs
+km sync my-sync logs -n 20             # Show most recent 20 runs
+km sync my-sync run-log <ID>           # View detailed logs for a specific run
 ```
 
 ### Variable Management
@@ -121,18 +133,24 @@ km var delete MY_VAR -y          # Delete without confirmation
 
 ### Run Executions
 
+Execute commands require confirmation by default. Use `-y` or `--yes` to skip confirmation for automation/scripting:
+
 ```sh
-# Triggers an example build
-km execute run-build test_build
-
-# Deploy a stack
+# Interactive (requires pressing ENTER)
 km execute deploy-stack my-stack
-
-# Run a procedure
+km execute run-sync my-sync
 km execute run-procedure my-procedure
 
-# Run a sync
-km execute run-sync my-sync
+# Non-interactive (for scripts/automation)
+km execute deploy-stack my-stack -y
+km execute run-sync my-sync --yes
+km execute run-procedure my-procedure -y
+```
+
+Other execution examples:
+```sh
+km execute run-build test_build -y       # Run a build
+km execute destroy-stack my-stack -y     # Destroy a stack
 ```
 
 ### Other Commands
@@ -141,10 +159,6 @@ km execute run-sync my-sync
 km config                        # Print the CLI config being used
 km container                     # Container info
 ```
-
-### --yes
-
-You can use `--yes` to avoid any human prompt to continue, for use in automated environments.
 
 ## Environment Variables
 
@@ -171,8 +185,8 @@ Commands:
   database   Database utilities
   stack      Stack operations (status, logs, services, deploys)
   variable   Variable management (list, get, create, delete)
-  procedure  Procedure operations (status, logs)
-  sync       Resource sync operations (status, logs, diff)
+  procedure  Procedure operations (status, logs, run-log)
+  sync       Resource sync operations (status, logs, run-log, diff)
   help       Print this message or the help of the given subcommand(s)
 
 Options:
