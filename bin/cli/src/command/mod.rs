@@ -21,6 +21,7 @@ pub mod list;
 pub mod procedure;
 pub mod stack;
 pub mod sync;
+pub mod terminal;
 pub mod update;
 pub mod variable;
 

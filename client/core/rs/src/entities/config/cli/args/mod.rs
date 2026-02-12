@@ -10,6 +10,7 @@ pub mod list;
 pub mod procedure;
 pub mod stack;
 pub mod sync;
+pub mod terminal;
 pub mod update;
 pub mod variable;
 
@@ -106,6 +107,10 @@ pub enum Command {
   /// Resource sync operations (list, status, logs, diff). (aliases: `sn`, `rs`)
   #[clap(alias = "sn", alias = "rs")]
   Sync(sync::Sync),
+
+  /// Terminal commands on hosts and containers. (aliases: `term`, `tm`)
+  #[clap(alias = "term", alias = "tm")]
+  Terminal(terminal::Terminal),
 }
 
 #[derive(Debug, Clone, clap::Parser)]

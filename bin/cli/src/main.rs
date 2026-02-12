@@ -67,6 +67,9 @@ async fn app() -> anyhow::Result<()> {
       command::procedure::handle(procedure).await
     }
     args::Command::Sync(sync) => command::sync::handle(sync).await,
+    args::Command::Terminal(terminal) => {
+      command::terminal::handle(terminal).await
+    }
   }
 }
 
