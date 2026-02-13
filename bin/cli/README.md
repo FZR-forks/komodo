@@ -153,6 +153,21 @@ km execute run-build test_build -y       # Run a build
 km execute destroy-stack my-stack -y     # Destroy a stack
 ```
 
+### Terminal Commands
+
+Run remote terminal commands on hosts and containers:
+```sh
+# Execute on a server terminal (terminal name defaults to "cli")
+km terminal host my-server -x "uname -a"
+km term host my-server -t maintenance -x "df -h"   # custom terminal name + alias
+
+# Execute inside a container shell
+km terminal container my-server nginx -x "ls -la /"
+km tm c my-server redis -s bash -x "printenv"       # alias + custom shell
+```
+
+The CLI streams command output directly and returns a non-zero exit if the remote command exits non-zero.
+
 ### Other Commands
 
 ```sh
@@ -187,6 +202,7 @@ Commands:
   variable   Variable management (list, get, create, delete)
   procedure  Procedure operations (status, logs, run-log)
   sync       Resource sync operations (status, logs, run-log, diff)
+  terminal   Terminal commands on hosts and containers
   help       Print this message or the help of the given subcommand(s)
 
 Options:
