@@ -4,16 +4,20 @@
 
 Use `km terminal host` / `km terminal container` with `--command` (`-x`) followed by one or more command tokens.
 
-Examples:
+## Examples
 
 ```bash
+# host terminal
 km terminal host server1 --command apt update
 km terminal host server1 -x "apt update"
-km terminal container server1 nginx -x ls -la /
+
+# container terminal
+km terminal container server1 nginx --command ls -la /
+km terminal container server1 redis -s bash -x printenv
 ```
 
-Notes:
+## Notes
 
-- `--command` accepts multiple arguments (`<COMMAND>...`).
-- Host execution auto-creates the default terminal (`cli`) when needed.
-- CLI output is streamed for non-interactive shells and the CLI process exits with the same code as the remote command.
+- `--command` accepts multiple arguments (`<COMMAND>...`) so quoting is optional.
+- `km terminal host` automatically retries once by creating the requested terminal if the initial execute call fails with `No terminal at <name>`.
+- CLI streams output line-by-line (including non-interactive shells) and exits with the remote command exit code.
