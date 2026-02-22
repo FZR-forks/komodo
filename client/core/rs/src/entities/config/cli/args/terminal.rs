@@ -23,8 +23,11 @@ pub struct HostTerminal {
   #[arg(long, short = 't', default_value = "cli")]
   pub terminal: String,
   /// Command to execute on the host.
-  #[arg(long, short = 'x')]
-  pub command: String,
+  ///
+  /// Supports multiple arguments without quoting:
+  /// `km terminal host server-1 --command apt update`
+  #[arg(long, short = 'x', num_args = 1..)]
+  pub command: Vec<String>,
 }
 
 #[derive(Debug, Clone, clap::Parser)]
@@ -34,8 +37,11 @@ pub struct ContainerTerminal {
   /// Container name.
   pub container: String,
   /// Command to execute in the container.
-  #[arg(long, short = 'x')]
-  pub command: String,
+  ///
+  /// Supports multiple arguments without quoting:
+  /// `km terminal container server-1 my-container --command apt update`
+  #[arg(long, short = 'x', num_args = 1..)]
+  pub command: Vec<String>,
   /// Shell to use inside the container.
   #[arg(long, short = 's', default_value = "sh")]
   pub shell: String,

@@ -292,6 +292,16 @@ pub async fn execute_terminal(
     );
   }
 
+  // Ensure host command execution works out-of-the-box for default terminals
+  // (e.g. `cli`) without requiring an explicit prior CreateTerminal call.
+  create_terminal(
+    terminal.clone(),
+    String::from("bash"),
+    TerminalRecreateMode::Never,
+  )
+  .await
+  .context("Failed to ensure host terminal exists")?;
+
   execute_command_on_terminal(&terminal, &command).await
 }
 

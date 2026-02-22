@@ -158,15 +158,19 @@ km execute destroy-stack my-stack -y     # Destroy a stack
 Run remote terminal commands on hosts and containers:
 ```sh
 # Execute on a server terminal (terminal name defaults to "cli")
-km terminal host my-server -x "uname -a"
-km term host my-server -t maintenance -x "df -h"   # custom terminal name + alias
+km terminal host my-server -x uname -a
+km term host my-server -t maintenance -x df -h   # custom terminal name + alias
 
 # Execute inside a container shell
-km terminal container my-server nginx -x "ls -la /"
-km tm c my-server redis -s bash -x "printenv"       # alias + custom shell
+km terminal container my-server nginx -x ls -la /
+km tm c my-server redis -s bash -x printenv       # alias + custom shell
 ```
 
-The CLI streams command output directly and returns a non-zero exit if the remote command exits non-zero.
+You can pass multi-argument commands either quoted or unquoted after `--command`.
+
+The CLI streams command output directly (including in non-interactive shells) and exits with the same status code as the remote command.
+
+For `terminal host`, if the requested terminal does not exist, the CLI attempts to create it and retries once.
 
 ### Other Commands
 

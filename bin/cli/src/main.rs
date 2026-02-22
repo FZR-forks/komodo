@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate tracing;
 
+use std::process;
+
 use anyhow::Context;
 use komodo_client::entities::config::cli::args;
 
@@ -78,8 +80,19 @@ async fn main() -> anyhow::Result<()> {
   let mut term_signal = tokio::signal::unix::signal(
     tokio::signal::unix::SignalKind::terminate(),
   )?;
-  tokio::select! {
+  let result = tokio::select! {
     res = tokio::spawn(app()) => res?,
     _ = term_signal.recv() => Ok(()),
+  };
+
+  if let Err(error) = result {
+    if let Some(exit) =
+      error.downcast_ref::<command::terminal::TerminalCommandExit>()
+    {
+      process::exit(exit.0);
+    }
+    return Err(error);
   }
+
+  Ok(())
 }
