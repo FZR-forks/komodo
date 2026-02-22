@@ -56,7 +56,7 @@ async fn execute_host(
           server: server.to_string(),
           name: terminal.to_string(),
           command: String::from("bash"),
-          recreate: TerminalRecreateMode::Never,
+          recreate: TerminalRecreateMode::DifferentCommand,
         })
         .await
         .with_context(|| {
