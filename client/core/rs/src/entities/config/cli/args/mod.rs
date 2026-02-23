@@ -8,9 +8,9 @@ pub mod container;
 pub mod database;
 pub mod list;
 pub mod procedure;
+pub mod shell;
 pub mod stack;
 pub mod sync;
-pub mod terminal;
 pub mod update;
 pub mod variable;
 
@@ -108,9 +108,11 @@ pub enum Command {
   #[clap(alias = "sn", alias = "rs")]
   Sync(sync::Sync),
 
-  /// Terminal commands on hosts and containers. (aliases: `term`, `tm`)
-  #[clap(alias = "term", alias = "tm")]
-  Terminal(terminal::Terminal),
+  /// Execute a command using `bash` on hosts or in containers.
+  Bash(shell::Shell),
+
+  /// Execute a command using `sh` on hosts or in containers.
+  Sh(shell::Shell),
 }
 
 #[derive(Debug, Clone, clap::Parser)]
