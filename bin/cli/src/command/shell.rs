@@ -71,6 +71,17 @@ async fn execute_host(
 ) -> anyhow::Result<()> {
   validate_command(command)?;
 
+  let terminal_shell = match shell_kind {
+    ShellKind::Bash => "bash",
+    // Reliability over strict shell identity for host execution:
+    // use the stable host terminal path.
+    ShellKind::Sh => "bash",
+  };
+  let execute_command = match shell_kind {
+    ShellKind::Bash => command.to_string(),
+    ShellKind::Sh => command.to_string(),
+  };
+
   let terminal = next_terminal_name(server, shell_kind);
   let client = super::komodo_client().await?;
 
@@ -78,7 +89,7 @@ async fn execute_host(
     .write(CreateTerminal {
       server: server.to_string(),
       name: terminal.clone(),
-      command: shell_kind.as_str().to_string(),
+      command: terminal_shell.to_string(),
       recreate: TerminalRecreateMode::Never,
     })
     .await
@@ -95,7 +106,7 @@ async fn execute_host(
       .execute_terminal(
         server.to_string(),
         terminal.clone(),
-        command.to_string(),
+        execute_command.clone(),
       )
       .await
       .with_context(|| {
@@ -203,11 +214,14 @@ async fn execute_container_with_shell(
 fn should_retry_with_sh(error: &anyhow::Error) -> bool {
   // Cover both low-level process startup errors and common shell not found messages.
   const PATTERNS: &[&str] = &[
+    "child process exited immediately with code 126",
     "child process exited immediately with code 127",
     "executable file not found",
     "no such file or directory",
     "bash: not found",
     "connection closed",
+    "failed to create terminal for container exec",
+    "failed to init terminal",
   ];
   let chain = error
     .chain()
@@ -279,16 +293,31 @@ async fn print_stream(
 
       let after_marker =
         &tail[marker_start + KOMODO_EXIT_CODE.len()..];
+
+      let Some(first_after_marker) = after_marker.chars().next()
+      else {
+        // Marker split across chunks, wait for more bytes.
+        tail = tail[marker_start..].to_string();
+        break;
+      };
+
+      if !first_after_marker.is_ascii_digit()
+        && first_after_marker != '-'
+      {
+        // False positive marker text in streamed output (for example,
+        // shell-echoed command containing `__KOMODO_EXIT_CODE:%d`).
+        print!("{KOMODO_EXIT_CODE}");
+        std::io::stdout()
+          .flush()
+          .context("Failed to flush shell output")?;
+        tail = after_marker.to_string();
+        continue;
+      }
+
       let digits_len = after_marker
         .chars()
         .take_while(|c| c.is_ascii_digit() || *c == '-')
         .count();
-
-      if digits_len == 0 {
-        // Marker split across chunks, wait for more bytes.
-        tail = tail[marker_start..].to_string();
-        break;
-      }
 
       let code = after_marker[..digits_len]
         .parse::<i32>()
