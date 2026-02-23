@@ -45,9 +45,10 @@ async fn execute_host(
   {
     Ok(stream) => stream,
     Err(error)
-      if error
-        .to_string()
-        .contains(&format!("No terminal at {terminal}")) =>
+      if error_chain_contains(
+        &error,
+        &format!("No terminal at {terminal}"),
+      ) =>
     {
       // Host command execution needs a server terminal. If it's missing,
       // create it once and retry.
@@ -78,6 +79,13 @@ async fn execute_host(
   };
 
   print_stream(stream).await
+}
+
+fn error_chain_contains(
+  error: &anyhow::Error,
+  pattern: &str,
+) -> bool {
+  error.chain().any(|cause| cause.to_string().contains(pattern))
 }
 
 async fn execute_container(
