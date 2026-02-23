@@ -103,21 +103,70 @@ async fn execute_container(
 async fn print_stream(
   response: komodo_client::terminal::TerminalStreamResponse,
 ) -> anyhow::Result<()> {
-  let mut stream = response.into_line_stream();
+  let mut stream = response.0.bytes_stream();
+
+  // Keep a small tail buffer so we can detect and strip the exit-code marker
+  // even if it arrives split across response chunks.
+  let mut tail = String::new();
   let mut exit_code = None;
 
-  while let Some(line) = stream.next().await {
-    let line =
-      line.context("Failed to parse terminal response line")?;
-    if let Some(code) = line
-      .trim_end()
-      .strip_prefix(KOMODO_EXIT_CODE)
-      .and_then(|n| n.parse::<i32>().ok())
-    {
+  while let Some(chunk) = stream.next().await {
+    let chunk =
+      chunk.context("Failed to read terminal response chunk")?;
+    tail.push_str(&String::from_utf8_lossy(&chunk));
+
+    while let Some(marker_start) = tail.find(KOMODO_EXIT_CODE) {
+      let before = &tail[..marker_start];
+      if !before.is_empty() {
+        print!("{before}");
+        std::io::stdout()
+          .flush()
+          .context("Failed to flush terminal output")?;
+      }
+
+      let after_marker =
+        &tail[marker_start + KOMODO_EXIT_CODE.len()..];
+      let digits_len = after_marker
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '-')
+        .count();
+
+      if digits_len == 0 {
+        // Marker split across chunks, wait for more bytes.
+        tail = tail[marker_start..].to_string();
+        break;
+      }
+
+      let code = after_marker[..digits_len]
+        .parse::<i32>()
+        .context("Failed to parse terminal exit code marker")?;
       exit_code = Some(code);
-      continue;
+
+      // Drop everything up to the end of marker line.
+      let rest = &after_marker[digits_len..];
+      if let Some(newline_idx) = rest.find('\n') {
+        tail = rest[newline_idx + 1..].to_string();
+      } else {
+        tail.clear();
+      }
     }
-    print!("{line}");
+
+    // Flush safe content while preserving enough look-behind for split marker.
+    let keep = KOMODO_EXIT_CODE.len() + 16;
+    if tail.len() > keep {
+      let flush_len = tail.len() - keep;
+      let flush = tail[..flush_len].to_string();
+      print!("{flush}");
+      std::io::stdout()
+        .flush()
+        .context("Failed to flush terminal output")?;
+      tail = tail[flush_len..].to_string();
+    }
+  }
+
+  // Flush any non-marker trailing output.
+  if !tail.is_empty() && !tail.contains(KOMODO_EXIT_CODE) {
+    print!("{tail}");
     std::io::stdout()
       .flush()
       .context("Failed to flush terminal output")?;
