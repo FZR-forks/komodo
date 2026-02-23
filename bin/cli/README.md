@@ -153,20 +153,30 @@ km execute run-build test_build -y       # Run a build
 km execute destroy-stack my-stack -y     # Destroy a stack
 ```
 
-### Terminal Commands
+### Shell Commands
 
-Run remote terminal commands on hosts and containers:
+Run remote commands with `bash` or `sh` on hosts and containers:
 ```sh
-# Execute on a server terminal (terminal name defaults to "cli")
-km terminal host my-server -x "uname -a"
-km term host my-server -t maintenance -x "df -h"   # custom terminal name + alias
+# Execute on a host
+km bash host my-server -x "uname -a"
+km sh host my-server -x "df -h"
 
-# Execute inside a container shell
-km terminal container my-server nginx -x "ls -la /"
-km tm c my-server redis -s bash -x "printenv"       # alias + custom shell
+# Execute inside a container
+km bash container my-server nginx -x "ls -la /"
+km sh container my-server caddy -x "printenv"
 ```
 
-The CLI streams command output directly and returns a non-zero exit if the remote command exits non-zero.
+Use quotes around `--command` (recommended for all usage), especially for shell operators and multiline commands:
+```sh
+km bash host my-server -x "set -e; whoami; id"
+km sh container my-server app -x $'echo start\nid\necho done'
+```
+
+Behavior notes:
+- `--command` / `-x` is required.
+- Host commands run in a temporary terminal that is created and deleted per command.
+- `km bash container ...` automatically retries with `sh` if `bash` is unavailable (common in Alpine images).
+- The CLI streams command output directly and exits with the same status code as the remote command.
 
 ### Other Commands
 
@@ -202,7 +212,8 @@ Commands:
   variable   Variable management (list, get, create, delete)
   procedure  Procedure operations (status, logs, run-log)
   sync       Resource sync operations (status, logs, run-log, diff)
-  terminal   Terminal commands on hosts and containers
+  bash       Execute a command using bash on hosts or in containers
+  sh         Execute a command using sh on hosts or in containers
   help       Print this message or the help of the given subcommand(s)
 
 Options:
@@ -211,4 +222,3 @@ Options:
   -h, --help                       Print help
   -V, --version                    Print version
 ```
-
