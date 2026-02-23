@@ -3,6 +3,7 @@ extern crate tracing;
 
 use anyhow::Context;
 use komodo_client::entities::config::cli::args;
+use std::process;
 
 use crate::config::cli_config;
 
@@ -67,8 +68,13 @@ async fn app() -> anyhow::Result<()> {
       command::procedure::handle(procedure).await
     }
     args::Command::Sync(sync) => command::sync::handle(sync).await,
-    args::Command::Terminal(terminal) => {
-      command::terminal::handle(terminal).await
+    args::Command::Bash(shell) => {
+      command::shell::handle(command::shell::ShellKind::Bash, shell)
+        .await
+    }
+    args::Command::Sh(shell) => {
+      command::shell::handle(command::shell::ShellKind::Sh, shell)
+        .await
     }
   }
 }
@@ -78,8 +84,19 @@ async fn main() -> anyhow::Result<()> {
   let mut term_signal = tokio::signal::unix::signal(
     tokio::signal::unix::SignalKind::terminate(),
   )?;
-  tokio::select! {
+  let result = tokio::select! {
     res = tokio::spawn(app()) => res?,
     _ = term_signal.recv() => Ok(()),
+  };
+
+  if let Err(error) = result {
+    if let Some(exit) =
+      error.downcast_ref::<command::shell::ShellCommandExit>()
+    {
+      process::exit(exit.0);
+    }
+    return Err(error);
   }
+
+  Ok(())
 }

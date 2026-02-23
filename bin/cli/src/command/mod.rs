@@ -19,9 +19,9 @@ pub mod database;
 pub mod execute;
 pub mod list;
 pub mod procedure;
+pub mod shell;
 pub mod stack;
 pub mod sync;
-pub mod terminal;
 pub mod update;
 pub mod variable;
 
