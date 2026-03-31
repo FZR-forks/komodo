@@ -5,7 +5,7 @@ use colored::Colorize;
 use futures_util::StreamExt;
 use komodo_client::{
   api::{
-    read::{ListAllDockerContainers, ListServers},
+    read::{GetServer, ListAllDockerContainers, ListServers},
     terminal::{
       ConnectTerminalQuery, ExecuteTerminalBody, InitTerminal,
     },
@@ -260,11 +260,14 @@ async fn get_server(
   }
 
   if containers.len() == 1 {
-    return containers
+    let server_id = containers
       .pop()
       .context("Shouldn't happen")?
       .server_id
-      .context("Container doesn't have server_id");
+      .context("Container doesn't have server_id")?;
+    let server_name =
+      client.read(GetServer { server: server_id }).await?.name;
+    return Ok(server_name);
   }
 
   let servers = containers

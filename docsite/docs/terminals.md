@@ -65,7 +65,7 @@ The `execute_terminal` API method runs a command on a terminal and streams outpu
 
 Upstream v2 uses a generic request shape built around `target`, `terminal`, `command`, and `init`. This fork's CLI commands map onto that API rather than the old pre-v2 terminal execution shape.
 
-The TypeScript client provides convenience methods for common target types:
+The TypeScript client provides convenience methods for each target type. All methods accept optional callbacks with `onLine` and `onFinish`.
 
 ```typescript
 await komodo.execute_server_terminal(
@@ -88,6 +88,33 @@ await komodo.execute_container_terminal(
     terminal: "debug",
     command: "cat /var/log/errors.log",
     init: { command: "sh", mode: "Exec", recreate: "Never" },
+  },
+  {
+    onLine: (line) => console.log(line),
+    onFinish: (code) => console.log("Exit code:", code),
+  },
+)
+
+await komodo.execute_stack_service_terminal(
+  {
+    stack: "my-stack",
+    service: "web",
+    terminal: "debug",
+    command: "nginx -t",
+    init: { command: "sh" },
+  },
+  {
+    onLine: (line) => console.log(line),
+    onFinish: (code) => console.log("Exit code:", code),
+  },
+)
+
+await komodo.execute_deployment_terminal(
+  {
+    deployment: "my-deployment",
+    terminal: "check",
+    command: "node --version",
+    init: { command: "sh", recreate: "Always" },
   },
   {
     onLine: (line) => console.log(line),
