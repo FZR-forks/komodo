@@ -7,7 +7,10 @@ use komodo_client::{
     Operation,
     config::cli::{
       CliTableBorders,
-      args::sync::{Sync, SyncCommand},
+      args::{
+        CliFormat,
+        sync::{Sync, SyncCommand},
+      },
     },
     sync::DiffData,
   },
@@ -17,16 +20,25 @@ use crate::config::cli_config;
 
 pub async fn handle(sync: &Sync) -> anyhow::Result<()> {
   match &sync.command {
-    SyncCommand::Status => show_status(&sync.sync).await,
-    SyncCommand::Logs { limit } => {
-      show_logs(&sync.sync, *limit).await
+    SyncCommand::Status { format } => {
+      show_status(&sync.sync, *format).await
     }
-    SyncCommand::RunLog { id } => show_run_log(id).await,
-    SyncCommand::Diff => show_diff(&sync.sync).await,
+    SyncCommand::Logs { limit, format } => {
+      show_logs(&sync.sync, *limit, *format).await
+    }
+    SyncCommand::RunLog { id, format } => {
+      show_run_log(id, *format).await
+    }
+    SyncCommand::Diff { format } => {
+      show_diff(&sync.sync, *format).await
+    }
   }
 }
 
-async fn show_status(name: &str) -> anyhow::Result<()> {
+async fn show_status(
+  name: &str,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   let sync = client
@@ -35,6 +47,10 @@ async fn show_status(name: &str) -> anyhow::Result<()> {
     })
     .await
     .context("Failed to get resource sync")?;
+
+  if matches!(format, CliFormat::Json) {
+    return super::print_json(&sync);
+  }
 
   println!("\n{}: {}", "Name".dimmed(), sync.name.bold());
   println!("{}: {}", "ID".dimmed(), sync.id);
@@ -95,7 +111,11 @@ async fn show_status(name: &str) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn show_logs(name: &str, limit: u32) -> anyhow::Result<()> {
+async fn show_logs(
+  name: &str,
+  limit: u32,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   // First get the sync to get its ID
@@ -121,6 +141,15 @@ async fn show_logs(name: &str, limit: u32) -> anyhow::Result<()> {
     })
     .await
     .context("Failed to list sync runs")?;
+
+  if matches!(format, CliFormat::Json) {
+    let updates = updates
+      .updates
+      .iter()
+      .take(limit as usize)
+      .collect::<Vec<_>>();
+    return super::print_json(&updates);
+  }
 
   if updates.updates.is_empty() {
     println!(
@@ -188,13 +217,20 @@ async fn show_logs(name: &str, limit: u32) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn show_run_log(id: &str) -> anyhow::Result<()> {
+async fn show_run_log(
+  id: &str,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   let update = client
     .read(GetUpdate { id: id.to_string() })
     .await
     .context("Failed to get sync run log")?;
+
+  if matches!(format, CliFormat::Json) {
+    return super::print_json(&update);
+  }
 
   println!("\n{}: {}", "Run ID".dimmed(), update.id.bold());
   println!("{}: {}", "Operation".dimmed(), update.operation);
@@ -239,7 +275,10 @@ async fn show_run_log(id: &str) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn show_diff(name: &str) -> anyhow::Result<()> {
+async fn show_diff(
+  name: &str,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   let sync = client
@@ -248,6 +287,10 @@ async fn show_diff(name: &str) -> anyhow::Result<()> {
     })
     .await
     .context("Failed to get resource sync")?;
+
+  if matches!(format, CliFormat::Json) {
+    return super::print_json(&sync.info);
+  }
 
   let has_resource_updates = !sync.info.resource_updates.is_empty();
   let has_variable_updates = !sync.info.variable_updates.is_empty();
