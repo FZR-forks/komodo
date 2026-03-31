@@ -38,11 +38,7 @@ impl RemoteCommandExit {
   }
 
   pub(crate) fn code(&self) -> i32 {
-    if (0..=255).contains(&self.code) {
-      self.code
-    } else {
-      1
-    }
+    self.code
   }
 }
 
