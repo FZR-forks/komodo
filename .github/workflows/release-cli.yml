@@ -6,7 +6,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  BINARY_NAME: km
 
 jobs:
   build:
@@ -19,15 +18,12 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             arch: x86_64
-            cross: true
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             arch: aarch64
-            cross: true
           - target: riscv64gc-unknown-linux-gnu
             os: ubuntu-latest
             arch: riscv64gc
-            cross: true
 
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +34,7 @@ jobs:
           targets: ${{ matrix.platform.target }}
 
       - name: Install cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        run: cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5
 
       - name: Build
         run: cross build --release --bin km --target ${{ matrix.platform.target }}
@@ -69,15 +65,10 @@ jobs:
             deb_arch: riscv64
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
           name: km-${{ matrix.platform.arch }}
-
-      - name: Install cargo-deb
-        run: cargo install cargo-deb
 
       - name: Build DEB package
         run: |
@@ -85,21 +76,7 @@ jobs:
           mkdir -p pkg/DEBIAN pkg/usr/bin
           chmod +x km-${{ matrix.platform.arch }}
           cp km-${{ matrix.platform.arch }} pkg/usr/bin/km
-
-          cat > pkg/DEBIAN/control <<EOF
-          Package: komodo-cli
-          Version: ${VERSION}
-          Section: utils
-          Priority: optional
-          Architecture: ${{ matrix.platform.deb_arch }}
-          Depends: libc6
-          Maintainer: Max Becker <becker.maxh@gmail.com>
-          Description: Komodo CLI
-           Command line tool for Komodo deployment management platform.
-           Provides the 'km' binary for interacting with Komodo.
-          Homepage: https://komo.do
-          EOF
-
+          printf 'Package: komodo-cli\nVersion: %s\nSection: utils\nPriority: optional\nArchitecture: %s\nDepends: libc6\nMaintainer: Max Becker <becker.maxh@gmail.com>\nDescription: Komodo CLI\n Command line tool for Komodo deployment management platform.\n Provides the '\''km'\'' binary for interacting with Komodo.\nHomepage: https://komo.do\n' "$VERSION" "${{ matrix.platform.deb_arch }}" > pkg/DEBIAN/control
           dpkg-deb --build pkg komodo-cli_${VERSION}_${{ matrix.platform.deb_arch }}.deb
 
       - name: Upload DEB artifact
@@ -124,8 +101,6 @@ jobs:
             rpm_arch: riscv64
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download binary
         uses: actions/download-artifact@v4
         with:
@@ -139,52 +114,23 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           RELEASE="1"
           chmod +x km-${{ matrix.platform.arch }}
+          RPM_ARCH=${{ matrix.platform.rpm_arch }}
+          BUILDROOT=komodo-cli-${VERSION}-${RELEASE}.${RPM_ARCH}
 
-          mkdir -p ~/rpmbuild/SOURCES
-          mkdir -p ~/rpmbuild/SPECS
-          mkdir -p ~/rpmbuild/BUILD
-          mkdir -p ~/rpmbuild/RPMS
+          mkdir -p ~/rpmbuild/{SOURCES,SPECS,BUILD,RPMS}
+          mkdir -p ~/rpmbuild/BUILDROOT/${BUILDROOT}/usr/bin
+          cp km-${{ matrix.platform.arch }} ~/rpmbuild/BUILDROOT/${BUILDROOT}/usr/bin/km
+          chmod +x ~/rpmbuild/BUILDROOT/${BUILDROOT}/usr/bin/km
 
-          mkdir -p ~/rpmbuild/BUILDROOT/komodo-cli-${VERSION}-${RELEASE}.${{ matrix.platform.rpm_arch }}/usr/bin
-          cp km-${{ matrix.platform.arch }} ~/rpmbuild/BUILDROOT/komodo-cli-${VERSION}-${RELEASE}.${{ matrix.platform.rpm_arch }}/usr/bin/km
-          chmod +x ~/rpmbuild/BUILDROOT/komodo-cli-${VERSION}-${RELEASE}.${{ matrix.platform.rpm_arch }}/usr/bin/km
-
-          cat > ~/rpmbuild/SPECS/komodo-cli.spec <<EOF
-          Name:           komodo-cli
-          Version:        ${VERSION}
-          Release:        ${RELEASE}%{?dist}
-          Summary:        Komodo CLI - command line tool for Komodo
-
-          License:        GPL-3.0-or-later
-          URL:            https://komo.do
-          Source0:        https://github.com/moghtech/komodo
-
-          ExclusiveArch:  ${{ matrix.platform.rpm_arch }}
-
-          %description
-          Command line tool for Komodo deployment management platform.
-          Provides the 'km' binary for interacting with Komodo.
-
-          %install
-          mkdir -p %{buildroot}/usr/bin
-          cp %{buildroot}/../km %{buildroot}/usr/bin/km
-          chmod +x %{buildroot}/usr/bin/km
-
-          %files
-          %license LICENSE
-          /usr/bin/km
-
-          %changelog
-          * $(date '+%a %b %d %Y') Komodo <becker.maxh@gmail.com> - ${VERSION}-${RELEASE}
-          - Release ${VERSION}
-          EOF
+          CHANGELOG_DATE=$(date '+%a %b %d %Y')
+          printf 'Name:           komodo-cli\nVersion:        %s\nRelease:        %s%%{?dist}\nSummary:        Komodo CLI - command line tool for Komodo\n\nLicense:        GPL-3.0-or-later\nURL:            https://komo.do\nSource0:        https://github.com/moghtech/komodo\n\nExclusiveArch:  %s\n\n%%description\nCommand line tool for Komodo deployment management platform.\nProvides the '\''km'\'' binary for interacting with Komodo.\n\n%%files\n/usr/bin/km\n\n%%changelog\n* %s Komodo <becker.maxh@gmail.com> - %s-%s\n- Release %s\n' "$VERSION" "$RELEASE" "$RPM_ARCH" "$CHANGELOG_DATE" "$VERSION" "$RELEASE" "$VERSION" > ~/rpmbuild/SPECS/komodo-cli.spec
 
           rpmbuild -bb \
-            --target ${{ matrix.platform.rpm_arch }} \
-            --buildroot ~/rpmbuild/BUILDROOT/komodo-cli-${VERSION}-${RELEASE}.${{ matrix.platform.rpm_arch }} \
+            --target ${RPM_ARCH} \
+            --buildroot ~/rpmbuild/BUILDROOT/${BUILDROOT} \
             ~/rpmbuild/SPECS/komodo-cli.spec
 
-          cp ~/rpmbuild/RPMS/${{ matrix.platform.rpm_arch }}/komodo-cli-*.rpm .
+          cp ~/rpmbuild/RPMS/${RPM_ARCH}/komodo-cli-*.rpm .
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
