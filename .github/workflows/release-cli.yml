@@ -1,0 +1,222 @@
+name: Release CLI
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY_NAME: km
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform.target }}
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            arch: x86_64
+            cross: true
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            arch: aarch64
+            cross: true
+          - target: riscv64gc-unknown-linux-gnu
+            os: ubuntu-latest
+            arch: riscv64gc
+            cross: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build
+        run: cross build --release --bin km --target ${{ matrix.platform.target }}
+
+      - name: Rename binary
+        run: |
+          mv target/${{ matrix.platform.target }}/release/km km-${{ matrix.platform.arch }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: km-${{ matrix.platform.arch }}
+          path: km-${{ matrix.platform.arch }}
+
+  package-deb:
+    name: DEB ${{ matrix.platform.arch }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - arch: x86_64
+            deb_arch: amd64
+          - arch: aarch64
+            deb_arch: arm64
+          - arch: riscv64gc
+            deb_arch: riscv64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: km-${{ matrix.platform.arch }}
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Build DEB package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p pkg/DEBIAN pkg/usr/bin
+          chmod +x km-${{ matrix.platform.arch }}
+          cp km-${{ matrix.platform.arch }} pkg/usr/bin/km
+
+          cat > pkg/DEBIAN/control <<EOF
+          Package: komodo-cli
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: ${{ matrix.platform.deb_arch }}
+          Depends: libc6
+          Maintainer: Max Becker <becker.maxh@gmail.com>
+          Description: Komodo CLI
+           Command line tool for Komodo deployment management platform.
+           Provides the 'km' binary for interacting with Komodo.
+          Homepage: https://komo.do
+          EOF
+
+          dpkg-deb --build pkg komodo-cli_${VERSION}_${{ matrix.platform.deb_arch }}.deb
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: komodo-cli_${{ matrix.platform.deb_arch }}.deb
+          path: komodo-cli_*_${{ matrix.platform.deb_arch }}.deb
+
+  package-rpm:
+    name: RPM ${{ matrix.platform.arch }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - arch: x86_64
+            rpm_arch: x86_64
+          - arch: aarch64
+            rpm_arch: aarch64
+          - arch: riscv64gc
+            rpm_arch: riscv64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: km-${{ matrix.platform.arch }}
+
+      - name: Install rpm tools
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Build RPM package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          RELEASE="1"
+          chmod +x km-${{ matrix.platform.arch }}
+
+          mkdir -p ~/rpmbuild/SOURCES
+          mkdir -p ~/rpmbuild/SPECS
+          mkdir -p ~/rpmbuild/BUILD
+          mkdir -p ~/rpmbuild/RPMS
+
+          mkdir -p ~/rpmbuild/BUILDROOT/komodo-cli-${VERSION}-${RELEASE}.${{ matrix.platform.rpm_arch }}/usr/bin
+          cp km-${{ matrix.platform.arch }} ~/rpmbuild/BUILDROOT/komodo-cli-${VERSION}-${RELEASE}.${{ matrix.platform.rpm_arch }}/usr/bin/km
+          chmod +x ~/rpmbuild/BUILDROOT/komodo-cli-${VERSION}-${RELEASE}.${{ matrix.platform.rpm_arch }}/usr/bin/km
+
+          cat > ~/rpmbuild/SPECS/komodo-cli.spec <<EOF
+          Name:           komodo-cli
+          Version:        ${VERSION}
+          Release:        ${RELEASE}%{?dist}
+          Summary:        Komodo CLI - command line tool for Komodo
+
+          License:        GPL-3.0-or-later
+          URL:            https://komo.do
+          Source0:        https://github.com/moghtech/komodo
+
+          ExclusiveArch:  ${{ matrix.platform.rpm_arch }}
+
+          %description
+          Command line tool for Komodo deployment management platform.
+          Provides the 'km' binary for interacting with Komodo.
+
+          %install
+          mkdir -p %{buildroot}/usr/bin
+          cp %{buildroot}/../km %{buildroot}/usr/bin/km
+          chmod +x %{buildroot}/usr/bin/km
+
+          %files
+          %license LICENSE
+          /usr/bin/km
+
+          %changelog
+          * $(date '+%a %b %d %Y') Komodo <becker.maxh@gmail.com> - ${VERSION}-${RELEASE}
+          - Release ${VERSION}
+          EOF
+
+          rpmbuild -bb \
+            --target ${{ matrix.platform.rpm_arch }} \
+            --buildroot ~/rpmbuild/BUILDROOT/komodo-cli-${VERSION}-${RELEASE}.${{ matrix.platform.rpm_arch }} \
+            ~/rpmbuild/SPECS/komodo-cli.spec
+
+          cp ~/rpmbuild/RPMS/${{ matrix.platform.rpm_arch }}/komodo-cli-*.rpm .
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: komodo-cli-${{ matrix.platform.rpm_arch }}.rpm
+          path: komodo-cli-*.rpm
+
+  release:
+    name: Publish Release Assets
+    needs: [build, package-deb, package-rpm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( \
+            -name 'km-*' -o \
+            -name '*.deb' -o \
+            -name '*.rpm' \
+          \) -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
