@@ -17,10 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
       - name: Rust version
         id: rust-version
         run: echo "version=$(rustc --version)" >> "$GITHUB_OUTPUT"
@@ -49,11 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          components: rustfmt
+      - name: Ensure rustfmt is available
+        run: rustup component add rustfmt
 
       - name: Check formatting
         run: cargo fmt --all -- --check

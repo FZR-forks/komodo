@@ -135,7 +135,6 @@ pub enum Command {
   /// Resource sync operations (list, status, logs, diff). (aliases: `sn`, `rs`)
   #[clap(alias = "sn", alias = "rs")]
   Sync(sync::Sync),
-
 }
 
 #[derive(Debug, Clone, clap::Parser)]

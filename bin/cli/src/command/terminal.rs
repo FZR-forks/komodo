@@ -6,7 +6,9 @@ use futures_util::StreamExt;
 use komodo_client::{
   api::{
     read::{ListAllDockerContainers, ListServers},
-    terminal::{ConnectTerminalQuery, ExecuteTerminalBody, InitTerminal},
+    terminal::{
+      ConnectTerminalQuery, ExecuteTerminalBody, InitTerminal,
+    },
   },
   entities::{
     KOMODO_EXIT_CODE,
@@ -28,14 +30,18 @@ use tokio_util::sync::CancellationToken;
 pub async fn handle_ssh(ssh: &Ssh) -> anyhow::Result<()> {
   match &ssh.target {
     SshTarget::Host(host) => connect_host(host).await,
-    SshTarget::Container(container) => connect_container(container).await,
+    SshTarget::Container(container) => {
+      connect_container(container).await
+    }
   }
 }
 
 pub async fn handle_exec(exec: &Exec) -> anyhow::Result<()> {
   match &exec.target {
     ExecTarget::Host(host) => execute_host(host).await,
-    ExecTarget::Container(container) => execute_container(container).await,
+    ExecTarget::Container(container) => {
+      execute_container(container).await
+    }
   }
 }
 
@@ -176,10 +182,7 @@ async fn connect_terminal(
       terminal: Some(terminal),
       init: Some(init),
     };
-    super::komodo_client()
-      .await?
-      .connect_terminal(&query)
-      .await
+    super::komodo_client().await?.connect_terminal(&query).await
   })
   .await
 }
