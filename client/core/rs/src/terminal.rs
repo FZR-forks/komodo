@@ -1,9 +1,10 @@
 use anyhow::Context;
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures_util::{Stream, StreamExt, TryStreamExt};
 
 use crate::{
   KomodoClient,
-  api::terminal::{ExecuteContainerExecBody, ExecuteTerminalBody},
+  api::terminal::{ExecuteTerminalBody, InitTerminal},
+  entities::terminal::TerminalTarget,
 };
 
 pub struct TerminalStreamResponse(pub reqwest::Response);
@@ -24,13 +25,11 @@ impl TerminalStreamResponse {
 }
 
 impl KomodoClient {
-  /// Executes command on a host terminal, and streams the output.
+  /// Executes a command against a terminal target and streams the output.
   #[tracing::instrument(level = "debug", skip(self))]
   pub async fn execute_terminal(
     &self,
-    server: String,
-    terminal: String,
-    command: String,
+    request: ExecuteTerminalBody,
   ) -> anyhow::Result<TerminalStreamResponse> {
     let req = self
       .reqwest
@@ -38,36 +37,49 @@ impl KomodoClient {
       .header("x-api-key", &self.key)
       .header("x-api-secret", &self.secret)
       .header("content-type", "application/json")
-      .json(&ExecuteTerminalBody {
-        server,
-        terminal,
-        command,
-      });
+      .json(&request);
     terminal_stream_response(req).await
   }
 
-  /// Executes command in a container shell, and streams the output.
+  /// Executes a command on a host terminal and streams the output.
   #[tracing::instrument(level = "debug", skip(self))]
-  pub async fn execute_container_exec(
+  pub async fn execute_server_terminal(
+    &self,
+    server: String,
+    terminal: Option<String>,
+    command: String,
+    init: Option<InitTerminal>,
+  ) -> anyhow::Result<TerminalStreamResponse> {
+    self
+      .execute_terminal(ExecuteTerminalBody {
+        target: TerminalTarget::Server {
+          server: Some(server),
+        },
+        terminal,
+        command,
+        init,
+      })
+      .await
+  }
+
+  /// Executes a command inside a container terminal and streams the output.
+  #[tracing::instrument(level = "debug", skip(self))]
+  pub async fn execute_container_terminal(
     &self,
     server: String,
     container: String,
-    shell: String,
+    terminal: Option<String>,
     command: String,
+    init: Option<InitTerminal>,
   ) -> anyhow::Result<TerminalStreamResponse> {
-    let req = self
-      .reqwest
-      .post(format!("{}/terminal/execute/container", self.address))
-      .header("x-api-key", &self.key)
-      .header("x-api-secret", &self.secret)
-      .header("content-type", "application/json")
-      .json(&ExecuteContainerExecBody {
-        server,
-        container,
-        shell,
+    self
+      .execute_terminal(ExecuteTerminalBody {
+        target: TerminalTarget::Container { server, container },
+        terminal,
         command,
-      });
-    terminal_stream_response(req).await
+        init,
+      })
+      .await
   }
 }
 

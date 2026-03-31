@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use crate::api::execute::Execution;
 
 pub mod container;
+pub mod create;
 pub mod database;
 pub mod list;
 pub mod procedure;
@@ -56,13 +57,9 @@ pub enum Command {
     unsanitized: bool,
   },
 
-  /// Container info (aliases: `ps`, `cn`, `containers`)
-  #[clap(alias = "ps", alias = "cn", alias = "containers")]
-  Container(container::Container),
-
-  /// Inspect containers (alias: `i`)
-  #[clap(alias = "i")]
-  Inspect(container::InspectContainer),
+  /// Print information about the connected Komodo Core. (alias: `core`)
+  #[clap(alias = "core")]
+  CoreInfo,
 
   /// List Komodo resources (aliases: `ls`, `resources`)
   #[clap(alias = "ls", alias = "resources")]
@@ -78,11 +75,43 @@ pub enum Command {
   )]
   Execute(Execute),
 
+  /// Create resources. (aliases: `new`, `cr`)
+  #[clap(alias = "new", alias = "cr")]
+  Create {
+    #[command(subcommand)]
+    command: create::CreateCommand,
+  },
+
   /// Update resource configuration. (alias: `set`)
   #[clap(alias = "set")]
   Update {
     #[command(subcommand)]
     command: update::UpdateCommand,
+  },
+
+  /// Container info (aliases: `ps`, `cn`, `containers`)
+  #[clap(alias = "ps", alias = "cn", alias = "containers")]
+  Container(container::Container),
+
+  /// Inspect containers (alias: `i`)
+  #[clap(alias = "i")]
+  Inspect(container::InspectContainer),
+
+  /// Connect to Server Terminals. (alias: `ssh`)
+  #[clap(alias = "ssh")]
+  Connect(terminal::Connect),
+
+  /// Connect to Container Terminals. `docker exec` analogue.
+  Exec(terminal::Exec),
+
+  /// Attach to Container Terminals. `docker attach` analogue.
+  Attach(terminal::Attach),
+
+  /// Private-Public key utilities. (alias: `k`)
+  #[clap(alias = "k")]
+  Key {
+    #[command(subcommand)]
+    command: mogh_pki::cli::KeyCommand,
   },
 
   /// Database utilities. (alias: `db`)
