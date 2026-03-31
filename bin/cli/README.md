@@ -85,6 +85,7 @@ km attach redis --server my-server -t attach-debug
 `-x` stays string-based on purpose. It avoids local shell and argument splitting issues that `-- ...` cannot avoid for remote execution.
 
 `exec` streams command output directly and exits non-zero if the remote command exits non-zero.
+The CLI propagates the remote command's exact exit code when Komodo emits it.
 
 ## Listing Resources
 
@@ -102,42 +103,54 @@ km list -a
 
 ```sh
 km stack my-stack status
+km stack my-stack status -f json
 km stk my-stack s
 
 km stack my-stack logs
+km stack my-stack logs -f json
 km stack my-stack logs -s nginx
 km stack my-stack logs -s nginx -s redis
 km stack my-stack logs -n 200
 km stack my-stack logs -t
 
 km stack my-stack services
+km stack my-stack services -f json
 
 km stack my-stack deploys
+km stack my-stack deploys -f json
 km stack my-stack deploys -n 20
 km stack my-stack deploy-log <ID>
+km stack my-stack deploy-log <ID> -f json
 ```
 
 ## Procedure Operations
 
 ```sh
 km procedure my-proc status
+km procedure my-proc status -f json
 km proc my-proc s
 
 km procedure my-proc logs
+km procedure my-proc logs -f json
 km procedure my-proc logs -n 20
 km procedure my-proc run-log <ID>
+km procedure my-proc run-log <ID> -f json
 ```
 
 ## Resource Sync Operations
 
 ```sh
 km sync my-sync status
+km sync my-sync status -f json
 km sn my-sync s
 km sync my-sync diff
+km sync my-sync diff -f json
 
 km sync my-sync logs
+km sync my-sync logs -f json
 km sync my-sync logs -n 20
 km sync my-sync run-log <ID>
+km sync my-sync run-log <ID> -f json
 ```
 
 ## Variable Management
