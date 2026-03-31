@@ -1,30 +1,83 @@
 #[derive(Debug, Clone, clap::Parser)]
-pub struct Terminal {
-  /// The terminal command to run.
+pub struct Ssh {
+  /// The terminal target to connect to.
   #[command(subcommand)]
-  pub command: TerminalCommand,
+  pub target: SshTarget,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
-pub enum TerminalCommand {
-  /// Execute a command against a host terminal.
+pub enum SshTarget {
+  /// Open an interactive shell on a host terminal.
   #[clap(alias = "h")]
-  Host(HostTerminal),
-  /// Execute a command in a container shell.
+  Host(SshHost),
+  /// Open an interactive shell in a container terminal.
   #[clap(alias = "c")]
-  Container(ContainerTerminal),
+  Container(SshContainer),
 }
 
 #[derive(Debug, Clone, clap::Parser)]
-pub struct HostTerminal {
+pub struct SshHost {
   /// Server id or name.
   pub server: String,
-  /// Terminal name on the server.
-  #[arg(long, short = 't', default_value = "cli")]
+  /// Terminal name on the host.
+  #[arg(long, short = 't', default_value = "ssh")]
   pub terminal: String,
-  /// Command to execute on the host.
+  /// Custom shell command to use to start the session, eg `bash`.
+  /// Defaults to the Periphery default.
+  #[arg(long, short = 's')]
+  pub shell: Option<String>,
+  /// Force fresh terminal to replace existing one.
+  #[arg(long, short = 'r', default_value_t = false)]
+  pub recreate: bool,
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct SshContainer {
+  /// The container (name) to connect to.
+  /// Will error if matches multiple containers but no server is defined.
+  pub container: String,
+  /// Specify server.
+  /// Required if multiple servers have the same container name.
+  #[arg(long)]
+  pub server: Option<String>,
+  /// Terminal name on the container target.
+  #[arg(long, short = 't', default_value = "ssh")]
+  pub terminal: String,
+  /// Shell to use inside the container.
+  #[arg(long, short = 's', default_value = "sh")]
+  pub shell: String,
+  /// Force fresh terminal to replace existing one.
+  #[arg(long, short = 'r', default_value_t = false)]
+  pub recreate: bool,
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct Exec {
+  /// The execution target.
+  #[command(subcommand)]
+  pub target: ExecTarget,
+}
+
+#[derive(Debug, Clone, clap::Subcommand)]
+pub enum ExecTarget {
+  /// Execute a one-off command against a host terminal.
+  #[clap(alias = "h")]
+  Host(ExecHost),
+  /// Execute a one-off command in a container shell.
+  #[clap(alias = "c")]
+  Container(ExecContainer),
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct ExecHost {
+  /// Server id or name.
+  pub server: String,
+  /// The remote command string to execute.
   #[arg(long, short = 'x')]
   pub command: String,
+  /// Terminal name on the host.
+  #[arg(long, short = 't', default_value = "cli")]
+  pub terminal: String,
   /// Shell command used when initializing the terminal.
   #[arg(long, short = 's')]
   pub shell: Option<String>,
@@ -34,14 +87,17 @@ pub struct HostTerminal {
 }
 
 #[derive(Debug, Clone, clap::Parser)]
-pub struct ContainerTerminal {
-  /// Server id or name.
-  pub server: String,
-  /// Container name.
+pub struct ExecContainer {
+  /// The container (name) to execute within.
+  /// Will error if matches multiple containers but no server is defined.
   pub container: String,
-  /// Command to execute in the container.
+  /// The remote command string to execute.
   #[arg(long, short = 'x')]
   pub command: String,
+  /// Specify server.
+  /// Required if multiple servers have the same container name.
+  #[arg(long)]
+  pub server: Option<String>,
   /// Terminal name on the container target.
   #[arg(long, short = 't', default_value = "cli")]
   pub terminal: String,
@@ -54,50 +110,17 @@ pub struct ContainerTerminal {
 }
 
 #[derive(Debug, Clone, clap::Parser)]
-pub struct Connect {
-  /// The server to connect to.
-  pub server: String,
-
-  /// Custom command to use to start the shell, eg `bash`.
-  /// Defaults to Periphery default.
-  pub command: Option<String>,
-
-  /// The terminal name to connect to. Default: `ssh`
-  #[arg(long, short = 'n', default_value_t = String::from("ssh"))]
-  pub name: String,
-
-  /// Force fresh terminal to replace existing one.
-  #[arg(long, short = 'r', default_value_t = false)]
-  pub recreate: bool,
-}
-
-#[derive(Debug, Clone, clap::Parser)]
-pub struct Exec {
-  /// The container (name) to connect to.
-  /// Will error if matches multiple containers but no Server is defined.
-  pub container: String,
-  /// The shell, eg `bash`.
-  pub shell: String,
-  /// Specify Server.
-  /// Required if multiple servers have same container name.
-  /// (alias: `s`)
-  #[arg(long, short = 's')]
-  pub server: Option<String>,
-  /// Force fresh terminal to replace existing one.
-  #[arg(long, short = 'r', default_value_t = false)]
-  pub recreate: bool,
-}
-
-#[derive(Debug, Clone, clap::Parser)]
 pub struct Attach {
   /// The container (name) to attach to.
-  /// Will error if matches multiple containers but no Server is defined.
+  /// Will error if matches multiple containers but no server is defined.
   pub container: String,
-  /// Specify Server.
-  /// Required if multiple servers have same container name.
-  /// (alias: `s`)
-  #[arg(long, short = 's')]
+  /// Specify server.
+  /// Required if multiple servers have the same container name.
+  #[arg(long)]
   pub server: Option<String>,
+  /// Terminal name on the container target.
+  #[arg(long, short = 't', default_value = "attach")]
+  pub terminal: String,
   /// Force fresh terminal to replace existing one.
   #[arg(long, short = 'r', default_value_t = false)]
   pub recreate: bool,

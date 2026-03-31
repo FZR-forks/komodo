@@ -1,5 +1,6 @@
 use anyhow::Context;
 use futures_util::{Stream, StreamExt, TryStreamExt};
+use mogh_error::deserialize_error;
 
 use crate::{
   KomodoClient,
@@ -98,7 +99,7 @@ async fn terminal_stream_response(
       .text()
       .await
       .context("Failed to convert response to text")?;
-    let error = serror::deserialize_error(text).context(status);
+    let error = deserialize_error(text).context(status);
     Err(error)
   }
 }

@@ -1,111 +1,128 @@
 # Komodo CLI
 
 The Komodo CLI, `km`, can be used to:
-  - Quickly **run executions** and update **resources** and **variables**.
-  - **Reset user passwords** and elevate users to **Super Admin**. 
-  - Perform Database **backup**, **restore**, and **copy**.
 
-The Komodo Core image comes packaged with the Komodo CLI,
-and is available for usage inside running container with `docker exec -it komodo-core km ...`.
-This way, it inherits the Core database config in order to easily perform backups with `km db backup -y`.
+- Quickly run executions and update resources.
+- Manage variables from scripts.
+- Reset user passwords and elevate users to Super Admin.
+- Perform database backup, restore, and copy.
+- Open interactive host and container terminal sessions.
+- Run one-shot remote terminal commands.
 
-### Examples
+The Komodo Core image comes packaged with the Komodo CLI and is available inside a running Core container with `docker exec -it komodo-core km ...`.
+This lets the CLI inherit Core-side configuration, which is especially useful for database workflows like `km db backup -y`.
 
-  - `km --help`
-  - `km deploy stack my-stack`
-  - `km run action my-action -y`
-  - `km database backup`
-  - `km db restore`
-  - `km set var MY_VAR my_value -y`
-  - `km update build my-build "version=1.19.0&branch=release"`
-  - `km x commit my-sync`
-  - `km set user mbecks super-admin true`
-  - `km set user mbecks password "temp-password"`
+## This Fork
 
-### Install
+This repository ships a CLI surface that differs slightly from upstream Komodo v2.
 
-There are binaries available for **Linux** (x86_64 / aarch64), **MacOS** (apple silicon), as
-well as a distroless image: **`ghcr.io/moghtech/komodo-cli`**.
+It keeps these fork-specific commands:
 
-#### Linux
+- `stack`
+- `procedure`
+- `sync`
+- `variable`
 
-You can install the binary using the following command:
+It also exposes terminal actions as:
 
-System-wide, as root, to `/usr/local/bin/km`:
+- `km ssh host ...`
+- `km ssh container ...`
+- `km exec host ... -x '...'`
+- `km exec container ... -x '...'`
+- `km attach ...`
+
+There is no public top-level `terminal` command in this fork.
+Internally, these commands still use the upstream v2 terminal API with `target` + `init`.
+
+Secret variable values are masked by default. Set `KM_SHOW_SECRETS=true` or `KM_SHOW_SECRETS=1` only when you intentionally want them displayed.
+
+## Examples
+
+- `km --help`
+- `km list terminals`
+- `km execute deploy-stack my-stack -y`
+- `km variable list`
+- `km ssh host my-server`
+- `km exec host my-server -x 'uname -a'`
+- `km exec container nginx --server my-server -x 'printenv'`
+- `km attach nginx --server my-server`
+- `km database backup -y`
+- `km update build my-build "version=2.0.0&branch=release"`
+- `km set user mbecks super-admin true`
+
+## Install
+
+There are binaries available for Linux (`x86_64` / `aarch64`), macOS (Apple silicon), and a distroless image at `ghcr.io/moghtech/komodo-cli`.
+
+### Linux
+
+Install system-wide to `/usr/local/bin/km`:
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/moghtech/komodo/main/scripts/install-cli.py | python3
 ```
 
-Or as non-root, to `${HOME}/.local/bin/km`:
+Install for a single user to `${HOME}/.local/bin/km`:
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/moghtech/komodo/main/scripts/install-cli.py | python3 - --user
 ```
 
-#### MacOS (Homebrew)
+### MacOS (Homebrew)
 
-Add the `moghtech/komodo` tap, then install `km`:
 ```bash
-brew tap moghtech/komodo && \
-  brew install km
+brew tap moghtech/komodo && brew install km
 ```
 
-#### Container
+### Container
 
-You can alias a docker run command:
 ```bash
 alias km='docker run --rm -v $HOME/.config/komodo:/config ghcr.io/moghtech/komodo-cli km'
 km config
 ```
 
-### Configure
+## Configure
 
-The CLI uses a configuration file to pass the Komodo host / api keys, database address and credentials,
-and configure some other behaviors. Additionally, all configuration fields can be individually overridden
-using **CLI arguments** or **environment variables**, with CLI arguments having top priority.
+The CLI loads configuration from files, CLI arguments, and environment variables. CLI arguments take precedence.
 
-Whenever you want to check how config will be loaded, you can use the `km config` command
-to print it out.
+Use `km config` to inspect the resolved configuration.
 
-#### File detection
+### File Detection
 
-When run, CLI will scan the **current working directory** in addition to `${HOME}/.config/komodo` for any files matching the wildcard pattern **`*komodo.cli*.*`**,
-parse them into a general representation, and then merge them together. Files which are detected later are merged later,
-meaning they will override on conflicting fields. By default, files in `${HOME}/.config/komodo` come first
-in the merge ordering, meaning they are **lower priority** than those detected in the current working directory.
-You can also override these default paths by passing `km -c /path/to/1/base.config.yaml -c ./overrides ...`.
+When run, the CLI scans the current working directory and `${HOME}/.config/komodo` for files matching `*komodo.cli*.*`.
+Files loaded later override conflicting fields from files loaded earlier.
 
-If you want `km` to find configuration files in another directory,
-you can make a `.kminclude` file inside one of the configured directories.
+Override the default search paths with `km -c /path/to/base.toml -c ./overrides ...`.
+
+You can also include additional locations by creating a `.kminclude` file in one of the configured directories:
 
 ```
 # Supports comments
 
-./.komodo    # relative to directory containing `.kminclude`
-
-/etc/komodo/komodo.cli.toml  # also supports absolute path
+./.komodo
+/etc/komodo/komodo.cli.toml
 ```
 
-Note that wildcards in these paths are **not supported**.
+Wildcards are not supported inside `.kminclude`.
 
-#### Profiles
+### Profiles
 
-In the files, you can configure multiple profiles, each with a name / aliases. Then you
-choose which config profile to use with `km -p <profile> ...`. This allows you to easily switch between
-multiple Cores you want to connect to, or different database backup / restore options.
+You can configure multiple profiles in the CLI config and select them with `km -p <profile> ...`.
+This is useful for switching between multiple Komodo cores or different database backup and restore settings.
 
-In order to avoid passing `-p <profile>` every time, you can set a
-`default_profile` at the top level of the configuration file. Additionally,
-any fields you would like to be the "default" across all profiles can be 
-set at the top level of the file.
+To avoid passing `-p` every time, set `default_profile` at the top level of the config file.
+Shared defaults can also be defined at the top level.
 
-#### Example File
+### Example File
 
-The configuration can also be passed as **YAML** or **JSON**.
-You can use it-tools to convert this TOML file to your preferred format:
-  - YAML: https://it-tools.tech/toml-to-yaml
-  - JSON: https://it-tools.tech/toml-to-json
+The configuration can also be passed as YAML or JSON.
+You can use it-tools to convert the TOML example:
+
+- YAML: https://it-tools.tech/toml-to-yaml
+- JSON: https://it-tools.tech/toml-to-json
 
 Quick download to `./komodo/komodo.cli.toml`:
+
 ```bash
 wget -P komodo https://raw.githubusercontent.com/moghtech/komodo/main/config/komodo.cli.toml
 ```

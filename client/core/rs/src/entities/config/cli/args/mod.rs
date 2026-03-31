@@ -97,11 +97,10 @@ pub enum Command {
   #[clap(alias = "i")]
   Inspect(container::InspectContainer),
 
-  /// Connect to Server Terminals. (alias: `ssh`)
-  #[clap(alias = "ssh")]
-  Connect(terminal::Connect),
+  /// Interactive terminal sessions on hosts and containers.
+  Ssh(terminal::Ssh),
 
-  /// Connect to Container Terminals. `docker exec` analogue.
+  /// Execute one-off commands on hosts and containers.
   Exec(terminal::Exec),
 
   /// Attach to Container Terminals. `docker attach` analogue.
@@ -137,9 +136,6 @@ pub enum Command {
   #[clap(alias = "sn", alias = "rs")]
   Sync(sync::Sync),
 
-  /// Terminal commands on hosts and containers. (aliases: `term`, `tm`)
-  #[clap(alias = "term", alias = "tm")]
-  Terminal(terminal::Terminal),
 }
 
 #[derive(Debug, Clone, clap::Parser)]

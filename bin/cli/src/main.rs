@@ -62,8 +62,8 @@ async fn app() -> anyhow::Result<()> {
     args::Command::Update { command } => {
       command::update::handle(command).await
     }
-    args::Command::Connect(connect) => {
-      command::terminal::handle_connect(connect).await
+    args::Command::Ssh(ssh) => {
+      command::terminal::handle_ssh(ssh).await
     }
     args::Command::Exec(exec) => {
       command::terminal::handle_exec(exec).await
@@ -87,9 +87,6 @@ async fn app() -> anyhow::Result<()> {
       command::procedure::handle(procedure).await
     }
     args::Command::Sync(sync) => command::sync::handle(sync).await,
-    args::Command::Terminal(terminal) => {
-      command::terminal::handle(terminal).await
-    }
   }
 }
 

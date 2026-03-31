@@ -6,18 +6,18 @@ use futures_util::StreamExt;
 use komodo_client::{
   api::{
     read::{ListAllDockerContainers, ListServers},
-    terminal::InitTerminal,
+    terminal::{ConnectTerminalQuery, ExecuteTerminalBody, InitTerminal},
   },
   entities::{
     KOMODO_EXIT_CODE,
     config::cli::args::terminal::{
-      Attach, Connect, ContainerTerminal, Exec, HostTerminal,
-      Terminal, TerminalCommand,
+      Attach, Exec, ExecContainer, ExecHost, ExecTarget, Ssh,
+      SshContainer, SshHost, SshTarget,
     },
     server::ServerQuery,
     terminal::{
       ContainerTerminalMode, TerminalRecreateMode,
-      TerminalResizeMessage, TerminalStdinMessage,
+      TerminalResizeMessage, TerminalStdinMessage, TerminalTarget,
     },
   },
   ws::terminal::TerminalWebsocket,
@@ -25,144 +25,179 @@ use komodo_client::{
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio_util::sync::CancellationToken;
 
-pub async fn handle(terminal: &Terminal) -> anyhow::Result<()> {
-  match &terminal.command {
-    TerminalCommand::Host(host) => execute_host(host).await,
-    TerminalCommand::Container(container) => {
-      execute_container(container).await
-    }
+pub async fn handle_ssh(ssh: &Ssh) -> anyhow::Result<()> {
+  match &ssh.target {
+    SshTarget::Host(host) => connect_host(host).await,
+    SshTarget::Container(container) => connect_container(container).await,
   }
 }
 
-pub async fn handle_connect(
-  Connect {
-    server,
-    name,
-    command,
-    recreate,
-  }: &Connect,
-) -> anyhow::Result<()> {
-  handle_terminal_forwarding(server, async {
-    super::komodo_client()
-      .await?
-      .connect_server_terminal(
-        server.to_string(),
-        Some(name.to_string()),
-        Some(InitTerminal {
-          command: command.clone(),
-          recreate: recreate_mode(*recreate),
-          mode: None,
-        }),
-      )
-      .await
-  })
-  .await
-}
-
-pub async fn handle_exec(
-  Exec {
-    server,
-    container,
-    shell,
-    recreate,
-  }: &Exec,
-) -> anyhow::Result<()> {
-  let server = get_server(server.clone(), container).await?;
-  handle_terminal_forwarding(&format!("{server}/{container}"), async {
-    super::komodo_client()
-      .await?
-      .connect_container_terminal(
-        server,
-        container.to_string(),
-        None,
-        Some(InitTerminal {
-          command: Some(shell.to_string()),
-          recreate: recreate_mode(*recreate),
-          mode: Some(ContainerTerminalMode::Exec),
-        }),
-      )
-      .await
-  })
-  .await
+pub async fn handle_exec(exec: &Exec) -> anyhow::Result<()> {
+  match &exec.target {
+    ExecTarget::Host(host) => execute_host(host).await,
+    ExecTarget::Container(container) => execute_container(container).await,
+  }
 }
 
 pub async fn handle_attach(
   Attach {
     server,
     container,
+    terminal,
     recreate,
   }: &Attach,
 ) -> anyhow::Result<()> {
   let server = get_server(server.clone(), container).await?;
-  handle_terminal_forwarding(
-    &format!("{server}/{container}-attach"),
-    async {
-      super::komodo_client()
-        .await?
-        .connect_container_terminal(
-          server,
-          container.to_string(),
-          None,
-          Some(InitTerminal {
-            command: None,
-            recreate: recreate_mode(*recreate),
-            mode: Some(ContainerTerminalMode::Attach),
-          }),
-        )
-        .await
+  connect_terminal(
+    TerminalTarget::Container {
+      server: server.clone(),
+      container: container.to_string(),
+    },
+    format!("{server}/{container} (attach)"),
+    terminal.to_string(),
+    InitTerminal {
+      command: None,
+      recreate: recreate_mode(*recreate),
+      mode: Some(ContainerTerminalMode::Attach),
+    },
+  )
+  .await
+}
+
+async fn connect_host(
+  SshHost {
+    server,
+    terminal,
+    shell,
+    recreate,
+  }: &SshHost,
+) -> anyhow::Result<()> {
+  connect_terminal(
+    TerminalTarget::Server {
+      server: Some(server.to_string()),
+    },
+    server.to_string(),
+    terminal.to_string(),
+    InitTerminal {
+      command: shell.clone(),
+      recreate: recreate_mode(*recreate),
+      mode: None,
+    },
+  )
+  .await
+}
+
+async fn connect_container(
+  SshContainer {
+    server,
+    container,
+    terminal,
+    shell,
+    recreate,
+  }: &SshContainer,
+) -> anyhow::Result<()> {
+  let server = get_server(server.clone(), container).await?;
+  connect_terminal(
+    TerminalTarget::Container {
+      server: server.clone(),
+      container: container.to_string(),
+    },
+    format!("{server}/{container}"),
+    terminal.to_string(),
+    InitTerminal {
+      command: Some(shell.to_string()),
+      recreate: recreate_mode(*recreate),
+      mode: Some(ContainerTerminalMode::Exec),
     },
   )
   .await
 }
 
 async fn execute_host(
-  HostTerminal {
+  ExecHost {
     server,
-    terminal,
     command,
+    terminal,
     shell,
     recreate,
-  }: &HostTerminal,
+  }: &ExecHost,
 ) -> anyhow::Result<()> {
-  let client = super::komodo_client().await?;
-  let stream = client
-    .execute_server_terminal(
-      server.to_string(),
-      Some(terminal.to_string()),
-      command.to_string(),
-      Some(InitTerminal {
-        command: shell.clone(),
-        recreate: recreate_mode(*recreate),
-        mode: None,
-      }),
-    )
-    .await?;
-  print_stream(stream).await
+  execute_target(
+    TerminalTarget::Server {
+      server: Some(server.to_string()),
+    },
+    command.to_string(),
+    terminal.to_string(),
+    InitTerminal {
+      command: shell.clone(),
+      recreate: recreate_mode(*recreate),
+      mode: None,
+    },
+  )
+  .await
 }
 
 async fn execute_container(
-  ContainerTerminal {
+  ExecContainer {
     server,
     container,
-    terminal,
     command,
+    terminal,
     shell,
     recreate,
-  }: &ContainerTerminal,
+  }: &ExecContainer,
+) -> anyhow::Result<()> {
+  let server = get_server(server.clone(), container).await?;
+  execute_target(
+    TerminalTarget::Container {
+      server,
+      container: container.to_string(),
+    },
+    command.to_string(),
+    terminal.to_string(),
+    InitTerminal {
+      command: Some(shell.to_string()),
+      recreate: recreate_mode(*recreate),
+      mode: Some(ContainerTerminalMode::Exec),
+    },
+  )
+  .await
+}
+
+async fn connect_terminal(
+  target: TerminalTarget,
+  label: String,
+  terminal: String,
+  init: InitTerminal,
+) -> anyhow::Result<()> {
+  handle_terminal_forwarding(&label, async move {
+    let query = ConnectTerminalQuery {
+      target,
+      terminal: Some(terminal),
+      init: Some(init),
+    };
+    super::komodo_client()
+      .await?
+      .connect_terminal(&query)
+      .await
+  })
+  .await
+}
+
+async fn execute_target(
+  target: TerminalTarget,
+  command: String,
+  terminal: String,
+  init: InitTerminal,
 ) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
   let stream = client
-    .execute_container_terminal(
-      server.to_string(),
-      container.to_string(),
-      Some(terminal.to_string()),
-      command.to_string(),
-      Some(InitTerminal {
-        command: Some(shell.to_string()),
-        recreate: recreate_mode(*recreate),
-        mode: Some(ContainerTerminalMode::Exec),
-      }),
-    )
+    .execute_terminal(ExecuteTerminalBody {
+      target,
+      terminal: Some(terminal),
+      command,
+      init: Some(init),
+    })
     .await?;
   print_stream(stream).await
 }
