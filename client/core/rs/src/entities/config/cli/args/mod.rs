@@ -15,8 +15,10 @@ pub mod terminal;
 pub mod update;
 pub mod variable;
 
+const CLI_VERSION: &str = "v2.0.0-Agentic";
+
 #[derive(Debug, clap::Parser)]
-#[command(name = "komodo-cli", version, about = "", author)]
+#[command(name = "komodo-cli", version = CLI_VERSION, about = "", author)]
 pub struct CliArgs {
   /// The command to run
   #[command(subcommand)]
@@ -139,22 +141,22 @@ pub enum Command {
 
 #[derive(Debug, Clone, clap::Parser)]
 pub struct Execute {
+  /// Top priority Komodo host.
+  /// Eg. "https://demo.komo.do"
+  #[arg(long, short = 'a', global = true)]
+  pub host: Option<String>,
+  /// Top priority api key.
+  #[arg(long, short = 'k', global = true)]
+  pub key: Option<String>,
+  /// Top priority api secret.
+  #[arg(long, short = 's', global = true)]
+  pub secret: Option<String>,
+  /// Always continue on user confirmation prompts.
+  #[arg(long, short = 'y', global = true, default_value_t = false)]
+  pub yes: bool,
   /// The execution to run.
   #[command(subcommand)]
   pub execution: Execution,
-  /// Top priority Komodo host.
-  /// Eg. "https://demo.komo.do"
-  #[arg(long, short = 'a')]
-  pub host: Option<String>,
-  /// Top priority api key.
-  #[arg(long, short = 'k')]
-  pub key: Option<String>,
-  /// Top priority api secret.
-  #[arg(long, short = 's')]
-  pub secret: Option<String>,
-  /// Always continue on user confirmation prompts.
-  #[arg(long, short = 'y', default_value_t = false)]
-  pub yes: bool,
 }
 
 #[derive(
