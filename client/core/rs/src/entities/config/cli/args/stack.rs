@@ -1,5 +1,7 @@
 //! CLI arguments for stack operations
 
+use super::CliFormat;
+
 #[derive(Debug, Clone, clap::Parser)]
 pub struct Stack {
   /// The stack name or id
@@ -14,7 +16,11 @@ pub struct Stack {
 pub enum StackCommand {
   /// Get status of the stack (aliases: `stat`, `s`)
   #[clap(alias = "stat", alias = "s")]
-  Status,
+  Status {
+    /// Specify the output format.
+    #[arg(long, short = 'f', default_value_t = CliFormat::Table)]
+    format: CliFormat,
+  },
 
   /// View container logs for the stack (aliases: `log`, `l`)
   #[clap(alias = "log", alias = "l")]
@@ -22,7 +28,11 @@ pub enum StackCommand {
 
   /// List services of the stack (aliases: `service`, `svc`, `sv`)
   #[clap(alias = "service", alias = "svc", alias = "sv")]
-  Services,
+  Services {
+    /// Specify the output format.
+    #[arg(long, short = 'f', default_value_t = CliFormat::Table)]
+    format: CliFormat,
+  },
 
   /// View deployment history for the stack (aliases: `dep`, `deployments`)
   #[clap(alias = "dep", alias = "deployments")]
@@ -30,6 +40,10 @@ pub enum StackCommand {
     /// Number of entries to show. Default: 10.
     #[arg(long, short = 'n', default_value = "10")]
     limit: u32,
+
+    /// Specify the output format.
+    #[arg(long, short = 'f', default_value_t = CliFormat::Table)]
+    format: CliFormat,
   },
 
   /// View logs for a specific deployment (alias: `dl`)
@@ -37,6 +51,10 @@ pub enum StackCommand {
   DeployLog {
     /// The update/deployment ID
     id: String,
+
+    /// Specify the output format.
+    #[arg(long, short = 'f', default_value_t = CliFormat::Table)]
+    format: CliFormat,
   },
 }
 
@@ -54,4 +72,8 @@ pub struct StackLogsOptions {
   /// Show timestamps in the logs.
   #[arg(long, short = 't', default_value_t = false)]
   pub timestamps: bool,
+
+  /// Specify the output format.
+  #[arg(long, short = 'f', default_value_t = CliFormat::Table)]
+  pub format: CliFormat,
 }

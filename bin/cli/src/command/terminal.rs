@@ -27,6 +27,29 @@ use komodo_client::{
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio_util::sync::CancellationToken;
 
+#[derive(Debug)]
+pub(crate) struct RemoteCommandExit {
+  code: i32,
+}
+
+impl RemoteCommandExit {
+  pub(crate) fn new(code: i32) -> Self {
+    Self { code }
+  }
+
+  pub(crate) fn code(&self) -> i32 {
+    self.code
+  }
+}
+
+impl std::fmt::Display for RemoteCommandExit {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "remote command exited with code {}", self.code)
+  }
+}
+
+impl std::error::Error for RemoteCommandExit {}
+
 pub async fn handle_ssh(ssh: &Ssh) -> anyhow::Result<()> {
   match &ssh.target {
     SshTarget::Host(host) => connect_host(host).await,
@@ -227,9 +250,7 @@ async fn print_stream(
 
   match exit_code {
     Some(0) => Ok(()),
-    Some(code) => Err(anyhow!(
-      "Terminal command exited with non-zero code: {code}"
-    )),
+    Some(code) => Err(RemoteCommandExit::new(code).into()),
     None => Err(anyhow!(
       "Terminal output closed without an exit code marker"
     )),

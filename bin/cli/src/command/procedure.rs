@@ -7,7 +7,10 @@ use komodo_client::{
     Operation,
     config::cli::{
       CliTableBorders,
-      args::procedure::{Procedure, ProcedureCommand},
+      args::{
+        CliFormat,
+        procedure::{Procedure, ProcedureCommand},
+      },
     },
   },
 };
@@ -16,17 +19,22 @@ use crate::config::cli_config;
 
 pub async fn handle(procedure: &Procedure) -> anyhow::Result<()> {
   match &procedure.command {
-    ProcedureCommand::Status => {
-      show_status(&procedure.procedure).await
+    ProcedureCommand::Status { format } => {
+      show_status(&procedure.procedure, *format).await
     }
-    ProcedureCommand::Logs { limit } => {
-      show_logs(&procedure.procedure, *limit).await
+    ProcedureCommand::Logs { limit, format } => {
+      show_logs(&procedure.procedure, *limit, *format).await
     }
-    ProcedureCommand::RunLog { id } => show_run_log(id).await,
+    ProcedureCommand::RunLog { id, format } => {
+      show_run_log(id, *format).await
+    }
   }
 }
 
-async fn show_status(name: &str) -> anyhow::Result<()> {
+async fn show_status(
+  name: &str,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   let procedure = client
@@ -35,6 +43,10 @@ async fn show_status(name: &str) -> anyhow::Result<()> {
     })
     .await
     .context("Failed to get procedure")?;
+
+  if matches!(format, CliFormat::Json) {
+    return super::print_json(&procedure);
+  }
 
   println!("\n{}: {}", "Name".dimmed(), procedure.name.bold());
   println!("{}: {}", "ID".dimmed(), procedure.id);
@@ -67,7 +79,11 @@ async fn show_status(name: &str) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn show_logs(name: &str, limit: u32) -> anyhow::Result<()> {
+async fn show_logs(
+  name: &str,
+  limit: u32,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   // First get the procedure to get its ID
@@ -92,6 +108,15 @@ async fn show_logs(name: &str, limit: u32) -> anyhow::Result<()> {
     })
     .await
     .context("Failed to list procedure runs")?;
+
+  if matches!(format, CliFormat::Json) {
+    let updates = updates
+      .updates
+      .iter()
+      .take(limit as usize)
+      .collect::<Vec<_>>();
+    return super::print_json(&updates);
+  }
 
   if updates.updates.is_empty() {
     println!(
@@ -158,13 +183,20 @@ async fn show_logs(name: &str, limit: u32) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn show_run_log(id: &str) -> anyhow::Result<()> {
+async fn show_run_log(
+  id: &str,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   let update = client
     .read(GetUpdate { id: id.to_string() })
     .await
     .context("Failed to get procedure run log")?;
+
+  if matches!(format, CliFormat::Json) {
+    return super::print_json(&update);
+  }
 
   println!("\n{}: {}", "Run ID".dimmed(), update.id.bold());
   println!("{}: {}", "Operation".dimmed(), update.operation);

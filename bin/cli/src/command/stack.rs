@@ -9,7 +9,10 @@ use komodo_client::{
     Operation,
     config::cli::{
       CliTableBorders,
-      args::stack::{Stack, StackCommand, StackLogsOptions},
+      args::{
+        CliFormat,
+        stack::{Stack, StackCommand, StackLogsOptions},
+      },
     },
   },
 };
@@ -18,17 +21,26 @@ use crate::config::cli_config;
 
 pub async fn handle(stack: &Stack) -> anyhow::Result<()> {
   match &stack.command {
-    StackCommand::Status => show_status(&stack.stack).await,
-    StackCommand::Logs(opts) => show_logs(&stack.stack, opts).await,
-    StackCommand::Services => list_services(&stack.stack).await,
-    StackCommand::Deploys { limit } => {
-      show_deploys(&stack.stack, *limit).await
+    StackCommand::Status { format } => {
+      show_status(&stack.stack, *format).await
     }
-    StackCommand::DeployLog { id } => show_deploy_log(id).await,
+    StackCommand::Logs(opts) => show_logs(&stack.stack, opts).await,
+    StackCommand::Services { format } => {
+      list_services(&stack.stack, *format).await
+    }
+    StackCommand::Deploys { limit, format } => {
+      show_deploys(&stack.stack, *limit, *format).await
+    }
+    StackCommand::DeployLog { id, format } => {
+      show_deploy_log(id, *format).await
+    }
   }
 }
 
-async fn show_status(name: &str) -> anyhow::Result<()> {
+async fn show_status(
+  name: &str,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   let stack = client
@@ -37,6 +49,10 @@ async fn show_status(name: &str) -> anyhow::Result<()> {
     })
     .await
     .context("Failed to get stack")?;
+
+  if matches!(format, CliFormat::Json) {
+    return super::print_json(&stack);
+  }
 
   println!("\n{}: {}", "Name".dimmed(), stack.name.bold());
   println!("{}: {}", "ID".dimmed(), stack.id);
@@ -72,7 +88,10 @@ async fn show_status(name: &str) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn list_services(stack: &str) -> anyhow::Result<()> {
+async fn list_services(
+  stack: &str,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   let services = client
@@ -81,6 +100,10 @@ async fn list_services(stack: &str) -> anyhow::Result<()> {
     })
     .await
     .context("Failed to list stack services")?;
+
+  if matches!(format, CliFormat::Json) {
+    return super::print_json(&services);
+  }
 
   if services.is_empty() {
     println!(
@@ -164,6 +187,10 @@ async fn show_logs(
     .await
     .context("Failed to get stack logs")?;
 
+  if matches!(opts.format, CliFormat::Json) {
+    return super::print_json(&log);
+  }
+
   if log.stdout.is_empty() && log.stderr.is_empty() {
     println!(
       "{}: No logs found for stack '{}'",
@@ -186,7 +213,11 @@ async fn show_logs(
   Ok(())
 }
 
-async fn show_deploys(name: &str, limit: u32) -> anyhow::Result<()> {
+async fn show_deploys(
+  name: &str,
+  limit: u32,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
 
   // First get the stack to get its ID
@@ -217,6 +248,15 @@ async fn show_deploys(name: &str, limit: u32) -> anyhow::Result<()> {
     })
     .await
     .context("Failed to list stack deployments")?;
+
+  if matches!(format, CliFormat::Json) {
+    let updates = updates
+      .updates
+      .iter()
+      .take(limit as usize)
+      .collect::<Vec<_>>();
+    return super::print_json(&updates);
+  }
 
   if updates.updates.is_empty() {
     println!(
@@ -277,7 +317,10 @@ async fn show_deploys(name: &str, limit: u32) -> anyhow::Result<()> {
   Ok(())
 }
 
-async fn show_deploy_log(id: &str) -> anyhow::Result<()> {
+async fn show_deploy_log(
+  id: &str,
+  format: CliFormat,
+) -> anyhow::Result<()> {
   use komodo_client::api::read::GetUpdate;
 
   let client = super::komodo_client().await?;
@@ -286,6 +329,10 @@ async fn show_deploy_log(id: &str) -> anyhow::Result<()> {
     .read(GetUpdate { id: id.to_string() })
     .await
     .context("Failed to get deployment log")?;
+
+  if matches!(format, CliFormat::Json) {
+    return super::print_json(&update);
+  }
 
   println!("\n{}: {}", "Deployment".dimmed(), update.id.bold());
   println!("{}: {}", "Operation".dimmed(), update.operation);

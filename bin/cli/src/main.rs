@@ -98,6 +98,9 @@ async fn main() -> anyhow::Result<()> {
   tokio::select! {
     res = tokio::spawn(app()) => match res {
       Ok(Err(e)) => {
+        if let Some(exit) = e.downcast_ref::<command::terminal::RemoteCommandExit>() {
+          std::process::exit(exit.code())
+        }
         eprintln!("{}: {e}", "ERROR".red());
         std::process::exit(1)
       }

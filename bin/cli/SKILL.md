@@ -36,12 +36,14 @@ km list -a                       # List all including down
 Get detailed information about a specific stack:
 ```sh
 km stack my-stack status         # Get detailed status
+km stack my-stack status -f json # Machine-readable status
 km stk my-stack s                # Using aliases
 ```
 
 View stack container logs:
 ```sh
 km stack my-stack logs                    # View container logs
+km stack my-stack logs -f json            # Machine-readable logs
 km stack my-stack logs -s nginx           # Filter to specific service
 km stack my-stack logs -s nginx -s redis  # Multiple services
 km stack my-stack logs -n 200 -t          # 200 lines with timestamps
@@ -50,13 +52,16 @@ km stack my-stack logs -n 200 -t          # 200 lines with timestamps
 List services in a stack:
 ```sh
 km stack my-stack services       # List all services and their state
+km stack my-stack services -f json  # Machine-readable services
 ```
 
 View deployment history:
 ```sh
 km stack my-stack deploys        # Show deployment history
+km stack my-stack deploys -f json # Machine-readable deployment history
 km stack my-stack deploys -n 20  # Show last 20 deployments
 km stack my-stack deploy-log <update-id>  # View logs for a specific deployment
+km stack my-stack deploy-log <update-id> -f json
 ```
 
 ### Procedure Operations
@@ -64,9 +69,12 @@ km stack my-stack deploy-log <update-id>  # View logs for a specific deployment
 Get information about a procedure:
 ```sh
 km procedure my-proc status      # Get detailed status
+km procedure my-proc status -f json
 km proc my-proc s                # Using aliases
 km procedure my-proc logs        # View run history
+km procedure my-proc logs -f json
 km procedure my-proc logs -n 20  # Show last 20 runs
+km procedure my-proc run-log <update-id> -f json
 ```
 
 ### Resource Sync Operations
@@ -74,9 +82,12 @@ km procedure my-proc logs -n 20  # Show last 20 runs
 Get information about a sync:
 ```sh
 km sync my-sync status           # Get detailed status
+km sync my-sync status -f json
 km sn my-sync s                  # Using aliases
 km sync my-sync logs             # View sync run history
+km sync my-sync logs -f json
 km sync my-sync diff             # Show pending diffs from upstream
+km sync my-sync diff -f json
 ```
 
 ### Variable Management
@@ -155,14 +166,14 @@ km exec container my-app --server my-server -x "ls /data"  # One-shot command in
 km attach my-container --server my-server    # Attach to container terminal
 ```
 
-The CLI streams command output directly and returns a non-zero exit if the remote command exits non-zero
+The CLI streams command output directly and returns the exact remote exit code when the remote command exits non-zero.
 
 ## Key Patterns
 
 - **Wildcards**: Many list/batch commands support wildcard patterns (`*`, `?`) for filtering by name
 - **Aliases**: Most commands have short aliases (e.g., `ls` for `list`, `x` for `execute`, `stk` for `stack`, `ps` for `container`)
 - **`-y` flag**: Skip confirmation prompts for automation/scripting
-- **`-f json`**: Get JSON output instead of tables for scripting
+- **`-f json`**: Prefer JSON output for automation on `list`, `stack`, `procedure`, and `sync`
 - **Profiles**: Use `-p profile-name` to switch between different Komodo instances
 - **Batch operations**: Use kebab-case batch execution commands (e.g., `batch-deploy`, `batch-destroy-stack`)
 
@@ -171,6 +182,6 @@ The CLI streams command output directly and returns a non-zero exit if the remot
 - When the user asks to "check on" or "see status of" something, start with `km ls` or `km stk <name> status`
 - When they want to "restart" or "redeploy", use the appropriate `km x` execution command
 - For debugging, suggest checking logs first: `km stk <name> logs` or `km ps -d` for down containers
-- Always prefer the short aliases when suggesting commands to keep things concise
+- Prefer full command names plus `-f json` when suggesting commands for automation
 - If the user mentions a specific server, use the `-s` filter flag to scope commands
 - For secret values, remind them about `KM_SHOW_SECRETS=true` if they need to see actual values
