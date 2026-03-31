@@ -49,13 +49,16 @@ def download_binary(args, bin_dir):
 	if os.path.isfile(bin_path):
 		os.remove(bin_path)
 
-	km_bin = "km-x86_64"
 	arch = platform.machine().lower()
 	if arch == "aarch64" or arch == "arm64":
 		print("aarch64 detected")
 		km_bin = "km-aarch64"
+	elif arch in ("riscv64", "riscv64gc"):
+		print("riscv64 detected")
+		km_bin = "km-riscv64gc"
 	else:
 		print("using x86_64 binary")
+		km_bin = "km-x86_64"
 
 	# download the binary to bin path
 	if os.system(f'curl -f -sSL {args.binary_url}/{args.version}/{km_bin} -o {bin_path}') != 0:
