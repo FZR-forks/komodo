@@ -3,9 +3,16 @@ name: Release CLI
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build and publish assets for
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
 
 jobs:
   build:
@@ -16,28 +23,27 @@ jobs:
       matrix:
         platform:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04
             arch: x86_64
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
             arch: aarch64
-          - target: riscv64gc-unknown-linux-gnu
-            os: ubuntu-latest
-            arch: riscv64gc
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
 
-      - name: Install cross
-        run: cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
 
       - name: Build
-        run: cross build --release --bin km --target ${{ matrix.platform.target }}
+        run: cargo build --release --bin km --target ${{ matrix.platform.target }}
 
       - name: Rename binary
         run: |
@@ -61,8 +67,6 @@ jobs:
             deb_arch: amd64
           - arch: aarch64
             deb_arch: arm64
-          - arch: riscv64gc
-            deb_arch: riscv64
 
     steps:
       - name: Download binary
@@ -72,7 +76,7 @@ jobs:
 
       - name: Build DEB package
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${RELEASE_TAG#v}"
           mkdir -p pkg/DEBIAN pkg/usr/bin
           chmod +x km-${{ matrix.platform.arch }}
           cp km-${{ matrix.platform.arch }} pkg/usr/bin/km
@@ -97,8 +101,6 @@ jobs:
             rpm_arch: x86_64
           - arch: aarch64
             rpm_arch: aarch64
-          - arch: riscv64gc
-            rpm_arch: riscv64
 
     steps:
       - name: Download binary
@@ -111,8 +113,13 @@ jobs:
 
       - name: Build RPM package
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          RAW_VERSION="${RELEASE_TAG#v}"
+          VERSION="${RAW_VERSION%%-*}"
+          RELEASE_SUFFIX="${RAW_VERSION#${VERSION}}"
           RELEASE="1"
+          if [ -n "$RELEASE_SUFFIX" ]; then
+            RELEASE="1.${RELEASE_SUFFIX#-}"
+          fi
           chmod +x km-${{ matrix.platform.arch }}
           RPM_ARCH=${{ matrix.platform.rpm_arch }}
           BUILDROOT=komodo-cli-${VERSION}-${RELEASE}.${RPM_ARCH}
@@ -165,4 +172,5 @@ jobs:
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: release-assets/*
