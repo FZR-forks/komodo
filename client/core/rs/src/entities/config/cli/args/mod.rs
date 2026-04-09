@@ -15,7 +15,7 @@ pub mod terminal;
 pub mod update;
 pub mod variable;
 
-const CLI_VERSION: &str = "v2.0.0-Agentic";
+const CLI_VERSION: &str = "v2.1.1-Agentic";
 
 #[derive(Debug, clap::Parser)]
 #[command(name = "komodo-cli", version = CLI_VERSION, about = "", author)]
