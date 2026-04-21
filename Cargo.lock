@@ -1149,7 +1149,7 @@ dependencies = [
 
 [[package]]
 name = "command"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "komodo_client",
  "shlex",
@@ -1488,7 +1488,7 @@ checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
 name = "database"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -1758,7 +1758,7 @@ dependencies = [
 
 [[package]]
 name = "encoding"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1800,7 +1800,7 @@ dependencies = [
 
 [[package]]
 name = "environment"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "formatting",
@@ -1929,7 +1929,7 @@ dependencies = [
 
 [[package]]
 name = "formatting"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "mogh_error",
 ]
@@ -2108,7 +2108,7 @@ dependencies = [
 
 [[package]]
 name = "git"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "command",
@@ -2707,7 +2707,7 @@ dependencies = [
 
 [[package]]
 name = "interpolate"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "komodo_client",
@@ -2867,7 +2867,7 @@ dependencies = [
 
 [[package]]
 name = "komodo_cli"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "bcrypt",
@@ -2898,7 +2898,7 @@ dependencies = [
 
 [[package]]
 name = "komodo_client"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "async_timing_util",
@@ -2937,7 +2937,7 @@ dependencies = [
 
 [[package]]
 name = "komodo_core"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -3010,7 +3010,7 @@ dependencies = [
 
 [[package]]
 name = "komodo_periphery"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -4065,7 +4065,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "periphery_client"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "encoding",
@@ -6033,7 +6033,7 @@ dependencies = [
 
 [[package]]
 name = "transport"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "anyhow",
  "axum",
