@@ -506,13 +506,14 @@ mod tests {
 
   #[test]
   fn preserves_shell_format_strings_verbatim() {
-    let command =
-      "docker inspect anubis-scribe --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}'";
+    let command = "docker inspect anubis-scribe --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}'";
 
     let script = execute_command_script(command);
 
     assert!(script.contains(command));
-    assert!(script.starts_with("set +e; printf '\n__KOMODO_START_OF_OUTPUT__\n\n'; "));
+    assert!(script.starts_with(
+      "set +e; printf '\n__KOMODO_START_OF_OUTPUT__\n\n'; "
+    ));
     assert!(script.ends_with("\n"));
   }
 
@@ -523,7 +524,9 @@ mod tests {
     let script = execute_command_script(command);
 
     assert!(script.contains("set +e;"));
-    assert!(script.contains("false; rc=$?; printf '\n__KOMODO_EXIT_CODE:%d\n__KOMODO_END_OF_OUTPUT__\n' \"$rc\""));
+    assert!(script.contains(
+      "false; rc=$?; printf '\n__KOMODO_EXIT_CODE:%d\n__KOMODO_END_OF_OUTPUT__\n' \"$rc\""
+    ));
   }
 }
 
