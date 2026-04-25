@@ -27,6 +27,14 @@ fn secrets_display_allowed() -> bool {
     .unwrap_or(false)
 }
 
+fn should_mask_secret_value(
+  is_secret: bool,
+  value: &str,
+  show_secrets: bool,
+) -> bool {
+  is_secret && !value.is_empty() && !show_secrets
+}
+
 pub async fn handle(variable: &Variable) -> anyhow::Result<()> {
   match &variable.command {
     VariableCommand::List { format } => list_variables(*format).await,
@@ -57,6 +65,7 @@ pub async fn handle(variable: &Variable) -> anyhow::Result<()> {
 
 async fn list_variables(format: CliFormat) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
+  let show_secrets = secrets_display_allowed();
 
   let variables = client
     .read(ListVariables {})
@@ -90,7 +99,11 @@ async fn list_variables(format: CliFormat) -> anyhow::Result<()> {
       );
 
       for var in variables {
-        let value_cell = if var.is_secret {
+        let value_cell = if should_mask_secret_value(
+          var.is_secret,
+          &var.value,
+          show_secrets,
+        ) {
           Cell::new("********").fg(Color::DarkYellow)
         } else {
           Cell::new(&var.value)
@@ -126,6 +139,7 @@ async fn list_variables(format: CliFormat) -> anyhow::Result<()> {
 
 async fn get_variable(name: &str) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
+  let show_secrets = secrets_display_allowed();
 
   let variable = client
     .read(GetVariable {
@@ -136,7 +150,11 @@ async fn get_variable(name: &str) -> anyhow::Result<()> {
 
   // For secret variables, require explicit opt-in via environment variable
   // Don't reveal the mechanism in the error message for security
-  if variable.is_secret && !secrets_display_allowed() {
+  if should_mask_secret_value(
+    variable.is_secret,
+    &variable.value,
+    show_secrets,
+  ) {
     println!("\n{}: {}", "Name".dimmed(), variable.name.bold());
     println!("{}: {}", "Value".dimmed(), "********".yellow());
     println!("{}: {}", "Secret".dimmed(), "Yes".yellow());
@@ -219,7 +237,7 @@ async fn create_variable(
   println!(" - {}:  {name}", "Name".dimmed());
 
   // Don't show the actual value if it's a secret
-  if secret {
+  if secret && !final_value.is_empty() {
     println!(" - {}: {}", "Value".dimmed(), "********".yellow());
   } else {
     println!(" - {}: {final_value}", "Value".dimmed());
@@ -278,4 +296,29 @@ async fn delete_variable(
   );
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::should_mask_secret_value;
+
+  #[test]
+  fn masks_non_empty_secret_when_hidden() {
+    assert!(should_mask_secret_value(true, "value", false));
+  }
+
+  #[test]
+  fn does_not_mask_empty_secret_when_hidden() {
+    assert!(!should_mask_secret_value(true, "", false));
+  }
+
+  #[test]
+  fn does_not_mask_secret_when_allowed() {
+    assert!(!should_mask_secret_value(true, "value", true));
+  }
+
+  #[test]
+  fn does_not_mask_non_secret() {
+    assert!(!should_mask_secret_value(false, "value", false));
+  }
 }
