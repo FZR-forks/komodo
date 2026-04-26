@@ -118,7 +118,9 @@ jobs:
           RELEASE_SUFFIX="${RAW_VERSION#${VERSION}}"
           RELEASE="1"
           if [ -n "$RELEASE_SUFFIX" ]; then
-            RELEASE="1.${RELEASE_SUFFIX#-}"
+            RELEASE_SUFFIX="${RELEASE_SUFFIX#-}"
+            RELEASE_SUFFIX="${RELEASE_SUFFIX//-/.}"
+            RELEASE="1.${RELEASE_SUFFIX}"
           fi
           chmod +x km-${{ matrix.platform.arch }}
           RPM_ARCH=${{ matrix.platform.rpm_arch }}
@@ -130,7 +132,7 @@ jobs:
           chmod +x ~/rpmbuild/BUILDROOT/${BUILDROOT}/usr/bin/km
 
           CHANGELOG_DATE=$(date '+%a %b %d %Y')
-          printf 'Name:           komodo-cli\nVersion:        %s\nRelease:        %s%%{?dist}\nSummary:        Komodo CLI - command line tool for Komodo\n\nLicense:        GPL-3.0-or-later\nURL:            https://komo.do\nSource0:        https://github.com/moghtech/komodo\n\nExclusiveArch:  %s\n\n%%description\nCommand line tool for Komodo deployment management platform.\nProvides the '\''km'\'' binary for interacting with Komodo.\n\n%%files\n/usr/bin/km\n\n%%changelog\n* %s Komodo <becker.maxh@gmail.com> - %s-%s\n- Release %s\n' "$VERSION" "$RELEASE" "$RPM_ARCH" "$CHANGELOG_DATE" "$VERSION" "$RELEASE" "$VERSION" > ~/rpmbuild/SPECS/komodo-cli.spec
+           printf 'Name:           komodo-cli\nVersion:        %s\nRelease:        %s%%{?dist}\nSummary:        Komodo CLI - command line tool for Komodo\n\nLicense:        GPL-3.0-or-later\nURL:            https://komo.do\nSource0:        https://github.com/moghtech/komodo\n\nExclusiveArch:  %s\n\n%%description\nCommand line tool for Komodo deployment management platform.\nProvides the '\''km'\'' binary for interacting with Komodo.\n\n%%files\n/usr/bin/km\n\n%%changelog\n* %s Komodo <becker.maxh@gmail.com> - %s-%s\n- Release %s\n' "$VERSION" "$RELEASE" "$RPM_ARCH" "$CHANGELOG_DATE" "$VERSION" "$RELEASE" "$RELEASE" > ~/rpmbuild/SPECS/komodo-cli.spec
 
           rpmbuild -bb \
             --target ${RPM_ARCH} \
