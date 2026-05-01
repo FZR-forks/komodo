@@ -1,4 +1,7 @@
-use std::future::Future;
+use std::{
+  future::Future,
+  time::{SystemTime, UNIX_EPOCH},
+};
 
 use anyhow::{Context, anyhow};
 use colored::Colorize;
@@ -9,6 +12,7 @@ use komodo_client::{
     terminal::{
       ConnectTerminalQuery, ExecuteTerminalBody, InitTerminal,
     },
+    write::DeleteTerminal,
   },
   entities::{
     KOMODO_EXIT_CODE,
@@ -214,47 +218,91 @@ async fn execute_target(
   target: TerminalTarget,
   command: String,
   terminal: String,
-  init: InitTerminal,
+  mut init: InitTerminal,
 ) -> anyhow::Result<()> {
   let client = super::komodo_client().await?;
-  let stream = client
+  let terminal = temporary_exec_terminal_name(&terminal);
+  init.recreate = TerminalRecreateMode::Always;
+
+  let res = match client
     .execute_terminal(ExecuteTerminalBody {
-      target,
-      terminal: Some(terminal),
+      target: target.clone(),
+      terminal: Some(terminal.clone()),
       command,
       init: Some(init),
     })
-    .await?;
-  print_stream(stream).await
+    .await
+  {
+    Ok(stream) => print_stream(stream).await,
+    Err(e) => Err(e),
+  };
+
+  if let Err(e) = client
+    .write(DeleteTerminal {
+      target,
+      terminal: terminal.clone(),
+    })
+    .await
+  {
+    eprintln!(
+      "{}: failed to delete temporary terminal '{terminal}' | {e}",
+      "WARN".yellow()
+    );
+  }
+
+  res
 }
 
 async fn print_stream(
   response: komodo_client::terminal::TerminalStreamResponse,
 ) -> anyhow::Result<()> {
   let mut stream = response.into_line_stream();
-  let mut exit_code = None;
+  let mut output = Vec::new();
 
   while let Some(line) = stream.next().await {
     let line =
       line.context("Failed to parse terminal response line")?;
-    if let Some(code) = line
-      .trim_end()
-      .strip_prefix(KOMODO_EXIT_CODE)
-      .and_then(|n| n.parse::<i32>().ok())
-    {
-      exit_code = Some(code);
-      continue;
-    }
-    print!("{line}");
+    output.extend_from_slice(line.as_bytes());
   }
+
+  let marker = KOMODO_EXIT_CODE.as_bytes();
+  let Some(marker_at) = find_last_subslice(&output, marker) else {
+    tokio::io::stdout().write_all(&output).await?;
+    return Err(anyhow!(
+      "Terminal output closed without an exit code marker"
+    ));
+  };
+
+  tokio::io::stdout()
+    .write_all(&output[..marker_at])
+    .await?;
+  let _ = tokio::io::stdout().flush().await;
+
+  let exit_code = output[marker_at + marker.len()..]
+    .split(|byte| *byte == b'\n' || *byte == b'\r')
+    .next()
+    .and_then(|bytes| std::str::from_utf8(bytes).ok())
+    .and_then(|code| code.parse::<i32>().ok());
 
   match exit_code {
     Some(0) => Ok(()),
     Some(code) => Err(RemoteCommandExit::new(code).into()),
-    None => Err(anyhow!(
-      "Terminal output closed without an exit code marker"
-    )),
+    None => Err(anyhow!("Invalid terminal exit code marker")),
   }
+}
+
+fn find_last_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+  haystack
+    .windows(needle.len())
+    .rposition(|window| window == needle)
+}
+
+fn temporary_exec_terminal_name(prefix: &str) -> String {
+  let timestamp = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map(|duration| duration.as_nanos())
+    .unwrap_or_default();
+  format!("{prefix}-exec-{}-{timestamp}", std::process::id())
 }
 
 async fn get_server(
