@@ -1,0 +1,178 @@
+name: Release CLI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build and publish assets for
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform.target }}
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+            arch: x86_64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            arch: aarch64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Build
+        run: cargo build --release --bin km --target ${{ matrix.platform.target }}
+
+      - name: Rename binary
+        run: |
+          mv target/${{ matrix.platform.target }}/release/km km-${{ matrix.platform.arch }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: km-${{ matrix.platform.arch }}
+          path: km-${{ matrix.platform.arch }}
+
+  package-deb:
+    name: DEB ${{ matrix.platform.arch }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - arch: x86_64
+            deb_arch: amd64
+          - arch: aarch64
+            deb_arch: arm64
+
+    steps:
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: km-${{ matrix.platform.arch }}
+
+      - name: Build DEB package
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          mkdir -p pkg/DEBIAN pkg/usr/bin
+          chmod +x km-${{ matrix.platform.arch }}
+          cp km-${{ matrix.platform.arch }} pkg/usr/bin/km
+          printf 'Package: komodo-cli\nVersion: %s\nSection: utils\nPriority: optional\nArchitecture: %s\nDepends: libc6\nMaintainer: Max Becker <becker.maxh@gmail.com>\nDescription: Komodo CLI\n Command line tool for Komodo deployment management platform.\n Provides the '\''km'\'' binary for interacting with Komodo.\nHomepage: https://komo.do\n' "$VERSION" "${{ matrix.platform.deb_arch }}" > pkg/DEBIAN/control
+          dpkg-deb --build pkg komodo-cli_${VERSION}_${{ matrix.platform.deb_arch }}.deb
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: komodo-cli_${{ matrix.platform.deb_arch }}.deb
+          path: komodo-cli_*_${{ matrix.platform.deb_arch }}.deb
+
+  package-rpm:
+    name: RPM ${{ matrix.platform.arch }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - arch: x86_64
+            rpm_arch: x86_64
+          - arch: aarch64
+            rpm_arch: aarch64
+
+    steps:
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: km-${{ matrix.platform.arch }}
+
+      - name: Install rpm tools
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Build RPM package
+        run: |
+          RAW_VERSION="${RELEASE_TAG#v}"
+          VERSION="${RAW_VERSION%%-*}"
+          RELEASE_SUFFIX="${RAW_VERSION#${VERSION}}"
+          RELEASE="1"
+          if [ -n "$RELEASE_SUFFIX" ]; then
+            RELEASE_SUFFIX="${RELEASE_SUFFIX#-}"
+            RELEASE_SUFFIX="${RELEASE_SUFFIX//-/.}"
+            RELEASE="1.${RELEASE_SUFFIX}"
+          fi
+          chmod +x km-${{ matrix.platform.arch }}
+          RPM_ARCH=${{ matrix.platform.rpm_arch }}
+          BUILDROOT=komodo-cli-${VERSION}-${RELEASE}.${RPM_ARCH}
+
+          mkdir -p ~/rpmbuild/{SOURCES,SPECS,BUILD,RPMS}
+          mkdir -p ~/rpmbuild/BUILDROOT/${BUILDROOT}/usr/bin
+          cp km-${{ matrix.platform.arch }} ~/rpmbuild/BUILDROOT/${BUILDROOT}/usr/bin/km
+          chmod +x ~/rpmbuild/BUILDROOT/${BUILDROOT}/usr/bin/km
+
+          CHANGELOG_DATE=$(date '+%a %b %d %Y')
+           printf 'Name:           komodo-cli\nVersion:        %s\nRelease:        %s%%{?dist}\nSummary:        Komodo CLI - command line tool for Komodo\n\nLicense:        GPL-3.0-or-later\nURL:            https://komo.do\nSource0:        https://github.com/moghtech/komodo\n\nExclusiveArch:  %s\n\n%%description\nCommand line tool for Komodo deployment management platform.\nProvides the '\''km'\'' binary for interacting with Komodo.\n\n%%files\n/usr/bin/km\n\n%%changelog\n* %s Komodo <becker.maxh@gmail.com> - %s-%s\n- Release %s\n' "$VERSION" "$RELEASE" "$RPM_ARCH" "$CHANGELOG_DATE" "$VERSION" "$RELEASE" "$RELEASE" > ~/rpmbuild/SPECS/komodo-cli.spec
+
+          rpmbuild -bb \
+            --target ${RPM_ARCH} \
+            --buildroot ~/rpmbuild/BUILDROOT/${BUILDROOT} \
+            ~/rpmbuild/SPECS/komodo-cli.spec
+
+          cp ~/rpmbuild/RPMS/${RPM_ARCH}/komodo-cli-*.rpm .
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: komodo-cli-${{ matrix.platform.rpm_arch }}.rpm
+          path: komodo-cli-*.rpm
+
+  release:
+    name: Publish Release Assets
+    needs: [build, package-deb, package-rpm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( \
+            -name 'km-*' -o \
+            -name '*.deb' -o \
+            -name '*.rpm' \
+          \) -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: release-assets/*

@@ -20,8 +20,12 @@ pub mod create;
 pub mod database;
 pub mod execute;
 pub mod list;
+pub mod procedure;
+pub mod stack;
+pub mod sync;
 pub mod terminal;
 pub mod update;
+pub mod variable;
 
 async fn komodo_client() -> anyhow::Result<&'static KomodoClient> {
   static KOMODO_CLIENT: OnceCell<KomodoClient> =
@@ -123,13 +127,20 @@ fn print_items<T: PrintTable + Serialize>(
       println!("{table}");
     }
     CliFormat::Json => {
-      println!(
-        "{}",
-        serde_json::to_string_pretty(&items)
-          .context("Failed to serialize items to JSON")?
-      );
+      print_json(&items)?;
     }
   }
+  Ok(())
+}
+
+pub(crate) fn print_json<T: Serialize>(
+  value: &T,
+) -> anyhow::Result<()> {
+  println!(
+    "{}",
+    serde_json::to_string_pretty(value)
+      .context("Failed to serialize value to JSON")?
+  );
   Ok(())
 }
 

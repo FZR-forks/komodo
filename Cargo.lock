@@ -3411,6 +3411,7 @@ version = "2.2.0"
 dependencies = [
  "anyhow",
  "bcrypt",
+ "bson",
  "chrono",
  "clap",
  "colored",

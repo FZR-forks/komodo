@@ -1,6 +1,30 @@
-# Komodo CLI
+# Komodo CLI (Agentic Fork)
 
-Komodo CLI is a tool to execute actions on your Komodo instance from shell scripts.
+Komodo CLI is a shell-friendly client for running Komodo actions from scripts and terminals.
+
+This fork tracks upstream Komodo and adds extra, agent-friendly commands on top:
+
+- `stack` — status, logs, services, deploys, deploy-log
+- `procedure` — status, logs, run-log
+- `sync` — status, logs, run-log, diff
+- `variable` — list, get, create (incl. `--from-command`), delete
+
+Everything else matches upstream behavior exactly, including the interactive terminal commands (`connect`/`exec`/`attach`).
+
+## Running commands on servers and in containers
+
+> **This CLI is not the right tool for running shell commands on servers or inside containers.**
+> Its terminal commands (`connect`, `exec`, `attach`) open **interactive** terminal sessions over
+> WebSocket and are meant for a human at a keyboard.
+
+For one-off or scripted commands on a host or in a container:
+
+1. **SSH directly into the server** using your normal SSH client (`ssh user@server`).
+2. From there, run host commands directly, or run a command inside a container with
+   `docker exec <container> <cmd>` / `docker compose exec <service> <cmd>`.
+
+Keep `km` for the Komodo REST/WebSocket surface (deploys, status, logs, variables, syncs,
+procedures) and use real SSH for everything that is just "run this command over there".
 
 ## Install
 
@@ -8,111 +32,182 @@ Komodo CLI is a tool to execute actions on your Komodo instance from shell scrip
 cargo install komodo_cli
 ```
 
-Note: On Ubuntu, also requires `apt install build-essential pkg-config libssl-dev`.
+On Ubuntu, also install:
 
-## Usage
+```sh
+apt install build-essential pkg-config libssl-dev
+```
 
-### Credentials
+## Configure
 
-Configure a file `~/.config/komodo/creds.toml` file with contents:
+Set credentials with environment variables:
+
+```sh
+export KM_KOMODO_URL="https://your.komodo.address"
+export KM_KOMODO_API_KEY="YOUR-API-KEY"
+export KM_KOMODO_API_SECRET="YOUR-API-SECRET"
+```
+
+Or create `~/.config/komodo/komodo.cli.toml`:
+
 ```toml
-url = "https://your.komodo.address"
-key = "YOUR-API-KEY"
-secret = "YOUR-API-SECRET"
+host = "https://your.komodo.address"
+cli_key = "YOUR-API-KEY"
+cli_secret = "YOUR-API-SECRET"
 ```
 
-Note. You can specify a different creds file by using `--creds ./other/path.toml`.
-You can also bypass using any file and pass the information using `--url`, `--key`, `--secret`:
+Inspect the resolved config with:
 
 ```sh
-komodo --url "https://your.komodo.address" --key "YOUR-API-KEY" --secret "YOUR-API-SECRET" ...
+km config
 ```
 
-### Run Executions
+## Interactive terminal commands
+
+These open a live, interactive terminal session (upstream behavior). They are for humans,
+not for scripting one-shot commands — see the note above.
 
 ```sh
-# Triggers an example build
-komodo execute run-build test_build
+# Interactive server shell (alias: ssh)
+km connect my-server
+km connect my-server bash
+
+# Interactive shell inside a container (`docker exec` analogue)
+km exec nginx --server my-server bash
+
+# Attach to a container's main process (`docker attach` analogue)
+km attach nginx --server my-server
 ```
 
-#### Manual
-`komodo --help`
-```md
-Command line tool to execute Komodo actions
+## Listing Resources
 
-Usage: komodo [OPTIONS] <COMMAND>
-
-Commands:
-  execute  Runs an execution
-  help     Print this message or the help of the given subcommand(s)
-
-Options:
-      --creds <CREDS>    The path to a creds file [default: /Users/max/.config/komodo/creds.toml]
-      --url <URL>        Pass url in args instead of creds file
-      --key <KEY>        Pass api key in args instead of creds file
-      --secret <SECRET>  Pass api secret in args instead of creds file
-  -y, --yes              Always continue on user confirmation prompts
-  -h, --help             Print help (see more with '--help')
-  -V, --version          Print version
+```sh
+km list
+km list stacks
+km list procedures
+km list syncs
+km list -d
+km list -a
 ```
 
-`komodo execute --help`
-```md
-Runs an execution
+## Stack Operations
 
-Usage: komodo execute <COMMAND>
+```sh
+km stack my-stack status
+km stack my-stack status -f json
+km stk my-stack s
 
-Commands:
-  none                    The "null" execution. Does nothing
-  run-procedure           Runs the target procedure. Response: [Update]
-  run-build               Runs the target build. Response: [Update]
-  cancel-build            Cancels the target build. Only does anything if the build is `building` when called. Response: [Update]
-  deploy                  Deploys the container for the target deployment. Response: [Update]
-  start-deployment        Starts the container for the target deployment. Response: [Update]
-  restart-deployment      Restarts the container for the target deployment. Response: [Update]
-  pause-deployment        Pauses the container for the target deployment. Response: [Update]
-  unpause-deployment      Unpauses the container for the target deployment. Response: [Update]
-  stop-deployment         Stops the container for the target deployment. Response: [Update]
-  destroy-deployment      Stops and destroys the container for the target deployment. Reponse: [Update]
-  clone-repo              Clones the target repo. Response: [Update]
-  pull-repo               Pulls the target repo. Response: [Update]
-  build-repo              Builds the target repo, using the attached builder. Response: [Update]
-  cancel-repo-build       Cancels the target repo build. Only does anything if the repo build is `building` when called. Response: [Update]
-  start-container         Starts the container on the target server. Response: [Update]
-  restart-container       Restarts the container on the target server. Response: [Update]
-  pause-container         Pauses the container on the target server. Response: [Update]
-  unpause-container       Unpauses the container on the target server. Response: [Update]
-  stop-container          Stops the container on the target server. Response: [Update]
-  destroy-container       Stops and destroys the container on the target server. Reponse: [Update]
-  start-all-containers    Starts all containers on the target server. Response: [Update]
-  restart-all-containers  Restarts all containers on the target server. Response: [Update]
-  pause-all-containers    Pauses all containers on the target server. Response: [Update]
-  unpause-all-containers  Unpauses all containers on the target server. Response: [Update]
-  stop-all-containers     Stops all containers on the target server. Response: [Update]
-  prune-containers        Prunes the docker containers on the target server. Response: [Update]
-  delete-network          Delete a docker network. Response: [Update]
-  prune-networks          Prunes the docker networks on the target server. Response: [Update]
-  delete-image            Delete a docker image. Response: [Update]
-  prune-images            Prunes the docker images on the target server. Response: [Update]
-  delete-volume           Delete a docker volume. Response: [Update]
-  prune-volumes           Prunes the docker volumes on the target server. Response: [Update]
-  prune-system            Prunes the docker system on the target server, including volumes. Response: [Update]
-  run-sync                Runs the target resource sync. Response: [Update]
-  deploy-stack            Deploys the target stack. `docker compose up`. Response: [Update]
-  start-stack             Starts the target stack. `docker compose start`. Response: [Update]
-  restart-stack           Restarts the target stack. `docker compose restart`. Response: [Update]
-  pause-stack             Pauses the target stack. `docker compose pause`. Response: [Update]
-  unpause-stack           Unpauses the target stack. `docker compose unpause`. Response: [Update]
-  stop-stack              Starts the target stack. `docker compose stop`. Response: [Update]
-  destroy-stack           Destoys the target stack. `docker compose down`. Response: [Update]
-  sleep                   
-  help                    Print this message or the help of the given subcommand(s)
+km stack my-stack logs
+km stack my-stack logs -f json
+km stack my-stack logs -s nginx
+km stack my-stack logs -s nginx -s redis
+km stack my-stack logs -n 200
+km stack my-stack logs -t
 
-Options:
-  -h, --help  Print help
+km stack my-stack services
+km stack my-stack services -f json
+
+km stack my-stack deploys
+km stack my-stack deploys -f json
+km stack my-stack deploys -n 20
+km stack my-stack deploy-log <ID>
+km stack my-stack deploy-log <ID> -f json
 ```
 
-### --yes
+## Procedure Operations
 
-You can use `--yes` to avoid any human prompt to continue, for use in automated environments.
+```sh
+km procedure my-proc status
+km procedure my-proc status -f json
+km proc my-proc s
 
+km procedure my-proc logs
+km procedure my-proc logs -f json
+km procedure my-proc logs -n 20
+km procedure my-proc run-log <ID>
+km procedure my-proc run-log <ID> -f json
+```
+
+## Resource Sync Operations
+
+```sh
+km sync my-sync status
+km sync my-sync status -f json
+km sn my-sync s
+km sync my-sync diff
+km sync my-sync diff -f json
+
+km sync my-sync logs
+km sync my-sync logs -f json
+km sync my-sync logs -n 20
+km sync my-sync run-log <ID>
+km sync my-sync run-log <ID> -f json
+```
+
+## Variable Management
+
+Secret values stay masked by default in this fork.
+
+```sh
+km variable list
+km var ls
+km var get MY_VAR
+```
+
+Enable secret display only when needed:
+
+```sh
+KM_SHOW_SECRETS=true km var get MY_SECRET
+KM_SHOW_SECRETS=1 km var get MY_SECRET
+```
+
+Create and delete variables:
+
+```sh
+km var create MY_VAR "my-value"
+km var create API_KEY "secret" -s
+km var create API_KEY -c "openssl rand -hex 32" -s
+km var delete MY_VAR
+km var delete MY_VAR -y
+```
+
+## Run Executions
+
+Execute commands require confirmation by default. Use `-y` or `--yes` for automation.
+
+```sh
+km execute deploy-stack my-stack
+km execute run-sync my-sync
+km execute run-procedure my-procedure
+
+km execute deploy-stack my-stack -y
+km execute run-sync my-sync --yes
+km execute run-procedure my-procedure -y
+
+km execute run-build test_build -y
+km execute destroy-stack my-stack -y
+```
+
+## Other Commands
+
+```sh
+km config
+km core-info
+km container
+km database
+km create
+km update
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `KM_KOMODO_URL` | Komodo server URL (alias: `KOMODO_CLI_HOST`) |
+| `KM_KOMODO_API_KEY` | API key (alias: `KOMODO_CLI_KEY`) |
+| `KM_KOMODO_API_SECRET` | API secret (alias: `KOMODO_CLI_SECRET`) |
+| `KM_SHOW_SECRETS` | Show secret variable values when set to `true` or `1` |
+
+## Full Command Reference
+
+Use `km --help` for the current command tree.

@@ -77,6 +77,16 @@ async fn app() -> anyhow::Result<()> {
     args::Command::Database { command } => {
       command::database::handle(command).await
     }
+    args::Command::Stack(stack) => {
+      command::stack::handle(stack).await
+    }
+    args::Command::Variable(variable) => {
+      command::variable::handle(variable).await
+    }
+    args::Command::Procedure(procedure) => {
+      command::procedure::handle(procedure).await
+    }
+    args::Command::Sync(sync) => command::sync::handle(sync).await,
   }
 }
 
